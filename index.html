@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>家系図作成webアプリ v0.7.3</title>
+<style>
+:root{--bg:#f6f3ec;--panel:#fffdf8;--ink:#2b2622;--sub:#7a6f63;--accent:#b5452f;--bd:#ddd3c4}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent}
+body{display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--bd);flex-wrap:wrap;position:relative;z-index:30}
+h1{font-size:16px;margin:0 6px 0 0;font-weight:700;white-space:nowrap}
+h1 small{font-weight:400;color:var(--sub);font-size:11px;margin-left:4px}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fff}
+.seg button{border:0;background:transparent;padding:6px 10px;font:inherit;font-size:13px;color:var(--sub);cursor:pointer}
+.seg button.on{background:var(--ink);color:#fff}
+.btn{border:1px solid var(--bd);background:#fff;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.danger{color:var(--accent);border-color:#e7c3b9}
+.spacer{flex:1}
+main{flex:1;position:relative;display:flex;min-height:0}
+#stage{flex:1;position:relative;min-width:0}
+#tree{width:100%;height:100%;display:block;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#tree.dragging{cursor:grabbing}
+#hint{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--sub);background:rgba(255,253,248,.85);padding:6px 10px;border-radius:8px;pointer-events:none}
+#zoom{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
+#zoom .btn{width:38px;height:38px;padding:0;font-size:18px}
+#empty{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
+#empty.show{display:flex}
+#empty .box{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:24px;text-align:center;max-width:340px;margin:16px}
+#empty h2{margin:0 0 8px;font-size:18px}
+#empty p{color:var(--sub);font-size:13px;margin:0 0 16px;line-height:1.6}
+#empty .btn{display:block;width:100%;padding:12px;margin-top:8px;font-size:15px}
+#empty .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+/* menu */
+#menu{position:absolute;top:100%;right:8px;background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px;display:none;min-width:240px;z-index:40}
+#menu.open{display:block}
+#menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;font:inherit;font-size:14px;border-radius:6px;cursor:pointer;color:var(--ink)}
+#menu button:hover{background:#f3eee5}
+#menu hr{border:0;border-top:1px solid var(--bd);margin:4px 0}
+#menu .note{font-size:11px;color:var(--sub);padding:2px 10px 6px}
+/* sheet */
+#sheet{width:320px;background:var(--panel);border-left:1px solid var(--bd);display:none;flex-direction:column;overflow:auto;padding:12px 14px 16px}
+#sheet.open{display:flex}
+.sh-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.grab{display:none}
+.sh-name{flex:1;font-size:17px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.x{border:0;background:none;font-size:22px;color:var(--sub);cursor:pointer;padding:0 4px}
+.acts{display:flex;gap:6px;margin-bottom:8px}
+.act{flex:1;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:10px;padding:11px 2px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.act:active{transform:scale(.97)}
+.acts2{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.acts2 .btn{flex:1;white-space:nowrap}
+#bExpand{display:none}
+.form label{display:block;font-size:12px;color:var(--sub);margin-bottom:10px}
+.form input[type=text],.form textarea{display:block;width:100%;margin-top:3px;padding:8px 9px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:16px;color:var(--ink);background:#fff}
+.form textarea{font-size:14px;resize:vertical}
+.row2{display:flex;gap:8px}.row2>*{flex:1;min-width:0}
+.lbl{font-size:12px;color:var(--sub);margin-bottom:4px}
+.form .seg{margin-bottom:10px}
+.form .chk{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink)}
+.form .chk input{width:18px;height:18px}
+.form .row2 .btn{font-size:12px;padding:8px 4px}
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:60}
+#modal.open{display:flex}
+#modal .box{background:var(--panel);border-radius:14px;padding:16px;min-width:260px;max-width:90vw}
+#modal h3{margin:0 0 10px;font-size:15px}
+#modal .btn{display:block;width:100%;margin-top:6px;padding:10px;text-align:left;font-size:14px}
+/* dates */
+.dt{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--sub);margin-bottom:2px}
+.eraBox{position:relative;flex:0 0 auto}
+.dEraIn{width:6.2em!important;text-align:left!important;font-size:14px!important}
+.dSug{position:absolute;left:0;top:100%;margin-top:2px;width:min(300px,80vw);max-height:260px;overflow:auto;background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 22px rgba(0,0,0,.15);z-index:80;display:none}
+.dSug.open{display:block}
+.dSug div{padding:8px 10px;font-size:13px;color:var(--ink);cursor:pointer;border-bottom:1px solid #f0ebe1}
+.dSug div:hover{background:#f6efe3}
+.dSug .none{color:var(--sub);cursor:default}
+.dt select{padding:7px 4px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+.dt input{width:2.8em;padding:7px 5px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:16px;text-align:center;color:var(--ink);background:#fff;min-width:0}
+.dt input.dY{width:4.8em}
+.dt{flex-wrap:wrap}
+.dt input:disabled,.dt select:disabled{opacity:.4}
+.dprev{font-size:12px;color:var(--ink);min-height:16px;margin:2px 0 10px 2px}
+#eraTbl{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:66}
+#eraTbl.open{display:flex}
+#eraTbl .box{background:var(--panel);border-radius:16px;padding:14px 16px;width:min(520px,94vw);height:min(720px,90vh);display:flex;flex-direction:column}
+#eraTbl .hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#eraTbl .hd h3{flex:1 1 100%;margin:0 0 4px;font-size:16px;display:flex}
+#eraTbl .hd h3 span{flex:1}
+#eraTbl #etYear{width:5.5em;padding:6px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:16px;text-align:center}
+#etWrap{flex:1;overflow:auto;border:1px solid var(--bd);border-radius:10px;background:#fff}
+#etWrap table{border-collapse:collapse;width:100%;font-size:13px}
+#etWrap th{position:sticky;top:0;background:#f3eee5;font-weight:600;font-size:12px;color:var(--sub);padding:6px;text-align:left}
+#etWrap td{padding:5px 6px;border-top:1px solid #eee7da;white-space:nowrap}
+#etWrap tr.c td{background:#fbe9e3;font-weight:700}
+#etWrap tr.b td:nth-child(2){color:var(--accent)}
+#etWrap td.y{font-variant-numeric:tabular-nums}
+#etWrap td.k,#etWrap .k{color:var(--sub);font-size:11px}
+#etWrap td.w{white-space:normal;min-width:6em}
+#etWrap.gak tr{cursor:pointer}#etWrap.gak tr:hover td{background:#f6efe3}
+#etWrap tr.sy td{outline:2px solid var(--accent);outline-offset:-2px}
+#etSchool{margin-bottom:8px;max-height:46%;overflow:auto}
+#etSchool .sc{border:1px solid var(--bd);border-radius:10px;background:#fff;padding:8px 10px}
+#etSchool .sh{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+#etSchool .sh b{font-size:15px}
+#etSchool .sh span{font-size:11px;color:var(--sub)}
+#etSchool table{border-collapse:collapse;width:100%;font-size:12.5px}
+#etSchool th{font-size:11px;color:var(--sub);font-weight:600;text-align:left;padding:3px 4px;border-bottom:1px solid var(--bd)}
+#etSchool td{padding:4px;border-bottom:1px solid #f0ebe1;vertical-align:top}
+#etSchool td.on{background:#fbe9e3;font-weight:700}
+#etSchool .k{color:var(--sub);font-size:10.5px}
+#etSchool .old{color:var(--accent);font-size:10.5px}
+#etSchool .hint{font-size:12px;color:var(--sub);padding:6px 2px}
+/* wizard */
+#wiz{display:none}
+#sheet.wizmode #wiz{display:block}
+#sheet.wizmode .acts,#sheet.wizmode .acts2,#sheet.wizmode .form{display:none!important}
+.wz-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}.wz-head b{flex:1;font-size:13px;color:var(--sub)}
+.wz-bubble{background:#fff;border:1.5px solid var(--ink);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:17px;font-weight:700;line-height:1.5;margin-bottom:12px}
+.wz-sub{font-size:12px;font-weight:400;color:var(--sub);margin-top:4px}
+.wz-in{display:block;width:100%;padding:12px;border:1.5px solid var(--bd);border-radius:12px;font:inherit;font-size:20px;background:#fff;color:var(--ink);margin-bottom:6px}
+.wz-prev{font-size:13px;color:var(--ink);min-height:18px;margin:0 0 8px 4px}
+.wz-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.wz-btns.grid .wz-b{flex:1 1 30%}
+.wz-b{flex:1 1 auto;min-width:88px;padding:13px 10px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);border-radius:12px;font:inherit;font-size:16px;cursor:pointer}
+.wz-b.main{background:var(--ink);color:#fff}
+.wz-b:active{transform:scale(.97)}
+.wz-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px}.wz-foot span{font-size:12px;color:var(--sub)}
+.wz-sum{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:14px;background:#fff;border-radius:10px}
+.wz-sum th{text-align:left;color:var(--sub);font-weight:600;font-size:12px;padding:6px 8px;width:4.5em;border-bottom:1px solid #f0ebe1}
+.wz-sum td{padding:6px 8px;border-bottom:1px solid #f0ebe1}
+@media (max-width:700px){#sheet.wizmode{max-height:72vh}}
+/* relations */
+.rrow{border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:6px;background:#fff;font-size:13px}
+.rrow .rh{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.rrow .rh b{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrow .rh span{font-size:11px;color:var(--sub)}
+.rrow .rc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rrow select,.rrow input{padding:5px 6px;border:1px solid var(--bd);border-radius:7px;font:inherit;font-size:13px;background:#fff;color:var(--ink)}
+.rrow input:not([type=radio]){width:6em}
+.rrow input[type=radio]{width:auto;margin:0}
+.rrow .btn{padding:4px 8px;font-size:12px}
+.rrow label{font-size:12px;display:flex;align-items:center;gap:3px;margin:0;color:var(--ink)}
+#linkM{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:67}
+#linkM.open{display:flex}
+#linkM .box{background:var(--panel);border-radius:16px;padding:14px 16px;width:min(420px,94vw);max-height:84vh;display:flex;flex-direction:column}
+#linkM .hd{display:flex;align-items:center;margin-bottom:8px}#linkM .hd h3{flex:1;margin:0;font-size:16px}
+#linkM input,#linkM select{padding:8px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:15px;margin-bottom:8px;width:100%;background:#fff}
+#lmList{overflow:auto;border:1px solid var(--bd);border-radius:10px;background:#fff;min-height:120px}
+#lmList div{padding:9px 10px;border-bottom:1px solid #f0ebe1;cursor:pointer;font-size:14px}
+#lmList div:hover{background:#f6efe3}
+#lmList small{color:var(--sub);margin-left:6px}
+/* settings */
+#scrollSet{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:65}
+#scrollSet.open{display:flex}
+#scrollSet .box{background:var(--panel);border-radius:16px;padding:16px 18px 8px;width:min(420px,94vw)}
+#scrollSet .hd{display:flex;align-items:center;margin-bottom:10px}#scrollSet .hd h3{flex:1;margin:0;font-size:17px}
+#settings{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:65}
+#settings.open{display:flex}
+#settings .box{background:var(--panel);border-radius:16px;padding:16px 18px 18px;width:min(560px,94vw);max-height:88vh;overflow:auto}
+#settings .hd{display:flex;align-items:center;margin-bottom:6px}
+#settings .hd h3{flex:1;margin:0;font-size:17px}
+#settings h4{font-size:13px;color:var(--sub);margin:14px 0 8px;font-weight:600}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.opts.small{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.opt{border:1.5px solid var(--bd);background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+.opt.on{border-color:var(--accent);box-shadow:0 0 0 2px #b5452f33}
+.opt .smp{font-size:18px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden}
+.opt .ol{font-size:12px}
+.opt .on2{font-size:10px;color:var(--sub)}
+.opt.sw,.opt.sx{align-items:center;text-align:center}
+.chip{display:block;width:56px;height:34px;border-radius:8px;border:1px solid;position:relative}
+.chip i{position:absolute;left:14px;top:9px;width:28px;height:16px;border-radius:4px;border:1px solid}
+.bars{display:flex;gap:4px;height:26px;align-items:center}
+.bars i{display:block;width:8px;height:26px;border-radius:3px}
+.bars.none{color:var(--sub);font-size:18px}
+.sexdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:1px}
+/* toast */
+#toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;display:none;z-index:70;align-items:center;gap:12px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+#toast.show{display:flex}
+#toast button{background:none;border:1px solid #fff8;color:#fff;border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}
+@media (max-width:700px){
+  h1 small{display:none}
+  header{gap:6px;padding:6px 8px}
+  .seg button{padding:6px 8px}
+  #sheet{position:fixed;left:0;right:0;bottom:0;width:auto;max-height:64vh;border-left:0;border-top:1px solid var(--bd);border-radius:18px 18px 0 0;box-shadow:0 -8px 28px rgba(0,0,0,.14);z-index:20;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .grab{display:block;position:absolute;left:50%;top:6px;width:40px;height:4px;border-radius:2px;background:#d6ccbd;transform:translateX(-50%)}
+  .sh-head{margin-top:6px}
+  #bExpand{display:block}
+  #sheet .form{display:none}
+  #sheet.expand .form{display:block}
+  #hint{display:none}
+  body.sheet-open #zoom{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>家系図作成webアプリ<small>v0.7.3</small></h1>
+  <div class="seg" id="segView"><button data-v="all">全体</button><button data-v="focus">この人中心</button><button data-v="anc">先祖</button><button data-v="desc">子孫</button><button data-v="scroll">巻物</button></div>
+  <div class="seg" id="segDir"><button data-v="h">横</button><button data-v="v">縦</button></div>
+  <button class="btn" id="bLone" title="誰ともつながっていない人を追加">＋人を追加</button>
+  <button class="btn" id="bUndo" title="元に戻す (Ctrl+Z)">↶</button>
+  <button class="btn" id="bRedo" title="やり直し (Ctrl+Shift+Z)">↷</button>
+  <span class="spacer"></span>
+  <button class="btn" id="bSet" title="設定">⚙️ 設定</button>
+  <button class="btn" id="bMenu">ファイル ▾</button>
+  <div id="menu">
+    <button data-m="new">新しく始める</button>
+    <button data-m="sample">見本の家系図を開く</button>
+    <hr>
+    <button data-m="saveJson">保存する（JSONファイル）</button>
+    <button data-m="open">開く（JSON / GEDCOM）</button>
+    <button data-m="saveGed">GEDCOMで書き出す</button>
+    <div class="note">GEDCOMは家系図ソフト共通の形式です</div>
+    <hr>
+    <button data-m="png">画像で書き出す（PNG）</button>
+    <button data-m="pngNames">公開用画像（存命の人は名前だけ）</button>
+    <button data-m="pngAnon">公開用画像（存命の人は匿名）</button>
+    <div class="note">データはこのブラウザの中だけに保存され、どこにも送信されません</div>
+  </div>
+  <input type="file" id="file" accept=".json,.ged,.gedcom,application/json,text/plain" hidden>
+</header>
+<main>
+  <div id="stage">
+    <svg id="tree" xmlns="http://www.w3.org/2000/svg"><g id="vp"></g></svg>
+    <div id="hint">人をクリックすると追加ボタンが出ます ／ ドラッグで移動・ホイールで拡大</div>
+    <div id="viewOpts" style="position:absolute;left:12px;top:12px;display:none;gap:10px;align-items:center;background:rgba(255,253,248,.92);border:1px solid var(--bd);border-radius:10px;padding:6px 10px;font-size:13px;flex-wrap:wrap;max-width:calc(100% - 24px)">
+      <span id="voWho" style="font-weight:700"></span>
+      <label style="display:flex;gap:4px;align-items:center"><select id="voDepth" style="padding:3px;border:1px solid var(--bd);border-radius:6px;font:inherit"></select>代まで</label>
+      <label id="voFanL" style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="voFan"> 扇形</label>
+      <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="voRel"> 呼び名</label>
+    </div>
+    <button class="btn" id="bScrollSet" style="position:absolute;left:12px;top:12px;display:none">📜 巻物の題・作成者</button>
+    <div id="zoom"><button class="btn" id="zIn">＋</button><button class="btn" id="zOut">−</button><button class="btn" id="zFit" title="全体を表示">⤢</button></div>
+    <div id="empty"><div class="box">
+      <h2>家系図をはじめよう</h2>
+      <p>まず1人登録して、そこから<br>親・配偶者・兄弟・子をつなげていきます。</p>
+      <button class="btn primary" id="eStart">自分から始める</button>
+      <button class="btn" id="eSample">見本を見てみる</button>
+      <button class="btn" id="eOpen">ファイルを開く</button>
+    </div></div>
+  </div>
+  <aside id="sheet">
+    <div class="grab"></div>
+    <div class="sh-head"><div id="shName" class="sh-name"></div><button class="x" id="shClose" title="閉じる">×</button></div>
+    <div class="acts">
+      <button class="act" data-act="parent">＋親</button>
+      <button class="act" data-act="spouse">＋配偶者</button>
+      <button class="act" data-act="sibling">＋兄弟</button>
+      <button class="act" data-act="child">＋子</button>
+    </div>
+    <div id="wiz">
+      <div class="wz-head"><b id="wzWho"></b><button class="btn" id="wzExit">ふつうの画面へ</button></div>
+      <div id="wzQ"></div><div id="wzA"></div>
+      <div class="wz-foot"><button class="btn" id="wzBack">← もどる</button><span id="wzProg"></span></div>
+    </div>
+    <div class="acts2">
+      <button class="btn" id="bWiz">💬 聞き取り</button>
+      <button class="btn" id="bExpand">✎ くわしく編集</button>
+      <button class="btn" id="bCenter">◎ この人を中心に</button>
+      <button class="btn danger" id="bDel">削除</button>
+    </div>
+    <div class="form">
+      <div class="row2"><label>姓<input type="text" id="fSei" data-f="sei"></label><label>名<input type="text" id="fMei" data-f="mei"></label></div>
+      <div class="row2"><label>よみ（名字）<input type="text" id="fSeiYomi" data-f="seiYomi" placeholder="やまだ"></label><label>よみ（名前）<input type="text" id="fMeiYomi" data-f="meiYomi" placeholder="たろう"></label></div>
+      <div id="yomiAlt" style="font-size:12px;color:var(--sub);margin:-6px 0 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"></div>
+      <label>旧姓（結婚・養子で姓が変わった人）<input type="text" id="fKyusei" data-f="kyusei" placeholder="佐藤"></label>
+      <div class="lbl">性別</div>
+      <div class="seg" id="fSex"><button data-v="m"><i class="sexdot"></i>男</button><button data-v="f"><i class="sexdot"></i>女</button><button data-v="u"><i class="sexdot"></i>不明</button></div>
+      <label>暦（どこの元号で書く人か）<select id="fCal" style="display:block;width:100%;margin-top:3px;padding:8px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:15px;background:#fff;color:var(--ink)"></select></label>
+      <div class="lbl">生まれ</div>
+      <div class="dt" id="dtB" data-k="bd"><div class="eraBox"><input class="dEraIn" autocomplete="off"><div class="dSug"></div></div><input class="dY" data-num inputmode="numeric" placeholder="年"><span>年</span><input class="dM" data-num inputmode="numeric" placeholder="月"><span>月</span><input class="dD" data-num inputmode="numeric" placeholder="日"><span>日</span></div>
+      <div class="dprev" id="pvB"></div>
+      <div class="lbl">没</div>
+      <div class="dt" id="dtD" data-k="dd"><div class="eraBox"><input class="dEraIn" autocomplete="off"><div class="dSug"></div></div><input class="dY" data-num inputmode="numeric" placeholder="年"><span>年</span><input class="dM" data-num inputmode="numeric" placeholder="月"><span>月</span><input class="dD" data-num inputmode="numeric" placeholder="日"><span>日</span></div>
+      <div class="dprev" id="pvD"></div>
+      <div class="row2" style="align-items:flex-end"><label>享年（生年がわからないとき）<input type="text" id="fKyonen" data-num data-f="kyonen" inputmode="numeric" placeholder="72"></label>
+        <label><select id="fKazoe" style="display:block;width:100%;margin-top:3px;padding:8px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:15px;background:#fff"><option value="">数え年</option><option value="man">満年齢</option></select></label></div>
+      <div style="display:flex;gap:14px;margin:-2px 0 10px"><label class="chk" style="margin:0"><input type="checkbox" id="fEarly"> 早世</label><label class="chk" style="margin:0"><input type="checkbox" id="fFu"> 父不詳</label></div>
+      <div class="lbl">つながり</div>
+      <div id="rel"></div>
+      <div class="row2" style="margin:4px 0 6px"><button class="btn" id="bLinkP">＋いる人と親子に</button><button class="btn" id="bLinkS">＋いる人と夫婦に</button></div>
+      <button class="btn" id="bAddAdopt" style="width:100%;margin-bottom:12px">＋養親を新しく追加</button>
+      <label class="chk"><input type="checkbox" id="fLiving"> 存命</label>
+      <div class="lbl" style="margin-top:4px">巻物用</div>
+      <div class="row2"><label>続柄<input type="text" id="fZoku" data-num data-f="zoku"></label><label>代数<input type="text" id="fDai" data-num data-f="dai"></label></div>
+      <label class="chk"><input type="checkbox" id="fHeir"> この人が家を継ぐ（当主の流れにする）</label>
+      <div style="font-size:11px;color:var(--sub);margin:-4px 0 10px;line-height:1.5">続柄・代数は空なら自動。番号を書き換えると、後ろの人も自動でずれます。</div>
+      <label>メモ<textarea id="fNote" data-f="note" rows="3"></textarea></label>
+      <div class="lbl">兄弟の順番</div>
+      <div class="row2"><button class="btn" id="bUp">← 上（年長）へ</button><button class="btn" id="bDown">下（年少）へ →</button></div>
+    </div>
+  </aside>
+</main>
+<div id="modal"><div class="box"><h3 id="mTitle"></h3><div id="mBody"></div><button class="btn" id="mCancel" style="text-align:center">やめる</button></div></div>
+<div id="settings"><div class="box">
+  <div class="hd"><h3>⚙️ 設定</h3><button class="x" id="setClose">×</button></div>
+  <h4>フォント</h4><div class="opts" id="setFont"></div>
+  <h4>背景</h4><div class="opts small" id="setTheme"></div>
+  <h4>性別の色（男・女・不明）</h4><div class="opts small" id="setSex"></div>
+  <h4>養子の線</h4><div class="opts small" id="setAdopt"></div>
+  <h4>年の書き方</h4><div class="opts" id="setDate"></div>
+  <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:10px"><input type="checkbox" id="setShort"> 元号を短く書く（S50・H元 など。明治以降のみ）</label>
+  <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="setEto"> 生まれ年に干支をそえる（巻物・編集画面）</label>
+  <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="setRuby"> 名前にふりがなを表示（カード・巻物）</label>
+  <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="setWiz"> 人を足したら聞き取りを始める</label>
+  <button class="btn" id="bEraTbl" style="margin-top:12px;width:100%;padding:10px">📅 西暦・元号・干支の対応表を見る</button>
+  <div style="font-size:11px;color:var(--sub);margin-top:14px;line-height:1.6">BIZ UDゴシック〜筆文字はGoogle Fontsから読み込みます（ネット接続が必要）。<br>設定はこのブラウザに保存されます。<br>元号データ：DILA時間規範資料庫をもとにした sanmiao（MIT License © Daniel Patrick Morgan）を整形して使用。朝鮮の独自元号は Wikipedia の一覧による。</div>
+</div></div>
+<div id="scrollSet" class="ovl"><div class="box form">
+  <div class="hd"><h3>📜 巻物の題・作成者</h3><button class="x" id="ssClose">×</button></div>
+  <label>題<input type="text" id="mtTitle" data-m="title"></label>
+  <label>始祖（巻物の右はしに来る人）<select id="mtRoot" style="display:block;width:100%;margin-top:3px;padding:8px;border:1px solid var(--bd);border-radius:8px;font:inherit;font-size:15px;background:#fff"></select></label>
+  <div class="row2"><label>作成日<input type="text" id="mtDate" data-num data-m="date"></label><label>作成者<input type="text" id="mtAuthor" data-m="author"></label></div>
+</div></div>
+<div id="eraTbl"><div class="box">
+  <div class="hd"><h3><span>📅 西暦・元号・干支の対応表</span><button class="x" id="etClose">×</button></h3>
+    <span style="font-size:13px">西暦</span><input id="etYear" data-num inputmode="numeric"><span style="font-size:13px">年の前後100年</span><span id="etColsBox" style="font-size:13px;display:flex;gap:14px;flex-basis:100%;align-items:center"><label><input type="checkbox" value="jp"> 日本</label><label><input type="checkbox" value="cn"> 中国</label><label><input type="checkbox" value="kr"> 朝鮮（独自元号）</label><label><input type="checkbox" value="gak"> 学年（入学・卒業）</label></span>
+    <button class="btn" id="etPrev">← 100年前</button><button class="btn" id="etNext">100年後 →</button><button class="btn" id="etNow">今年</button></div>
+  <div id="etSchool"></div>
+  <div id="etWrap"></div>
+  <div style="font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5">赤字＝元号が変わった年。（南）（北）は南北朝の南朝・北朝。旧暦の時代（日本は明治5年まで、中国は1911年まで）は、西暦とは1か月ほどずれます。</div>
+</div></div>
+<div id="linkM"><div class="box">
+  <div class="hd"><h3 id="lmTitle"></h3><button class="x" id="lmClose">×</button></div>
+  <select id="lmType"></select>
+  <input id="lmQ" placeholder="名前で探す">
+  <div id="lmList"></div>
+</div></div>
+<div id="toast"><span id="tMsg"></span><button id="tBtn"></button></div>
+
+<script>
+(()=>{
+'use strict';
+const CW=120,CH=56,SG=26;
+const KEY='kakeizu-webapp-v1';
+const $=s=>document.querySelector(s);
+/* ---------- 設定（フォント・背景・性別の色） ---------- */
+const SANS='"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif';
+const SERIF='"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif';
+const FONTS=[
+  {k:'auto',label:'おまかせ',note:'横はゴシック・縦は明朝'},
+  {k:'gothic',label:'ゴシック',note:'端末の標準',stack:SANS},
+  {k:'mincho',label:'明朝',note:'端末の標準',stack:SERIF},
+  {k:'bizud',label:'BIZ UDゴシック',note:'読みやすい',family:'BIZ UDPGothic',gf:'BIZ+UDPGothic:wght@400;700',base:SANS},
+  {k:'zenmaru',label:'Zen丸ゴシック',note:'やわらか',family:'Zen Maru Gothic',gf:'Zen+Maru+Gothic:wght@500;700',base:SANS},
+  {k:'shippori',label:'しっぽり明朝',note:'上品な明朝',family:'Shippori Mincho',gf:'Shippori+Mincho:wght@500;700',base:SERIF},
+  {k:'klee',label:'クレー',note:'手書き・教科書風',family:'Klee One',gf:'Klee+One:wght@400;600',base:SERIF},
+  {k:'yuji',label:'佑字 肅',note:'筆文字',family:'Yuji Syuku',gf:'Yuji+Syuku',base:SERIF},
+];
+const THEMES=[
+  {k:'kinari',label:'生成り',bg:'#f6f3ec',card:'#ffffff',stroke:'#cfc4b4',line:'#6a5d52',ink:'#2b2622',sub:'#7a6f63',sel:'#b5452f'},
+  {k:'white',label:'白',bg:'#ffffff',card:'#ffffff',stroke:'#c9c9c9',line:'#555555',ink:'#222222',sub:'#777777',sel:'#d0402b'},
+  {k:'washi',label:'和紙',bg:'#ece2cc',card:'#faf5e9',stroke:'#c3b393',line:'#5a4a35',ink:'#2a2118',sub:'#7d6b52',sel:'#a33a26'},
+  {k:'sakura',label:'桜',bg:'#fbeef0',card:'#ffffff',stroke:'#e6c3ca',line:'#8a5a64',ink:'#3a2a2e',sub:'#8c6f75',sel:'#c2364f'},
+  {k:'wakakusa',label:'若草',bg:'#eef3e4',card:'#ffffff',stroke:'#c4d2ad',line:'#4f6140',ink:'#24301c',sub:'#6b7a5c',sel:'#b5452f'},
+  {k:'sora',label:'空',bg:'#eaf2f8',card:'#ffffff',stroke:'#bcd0e0',line:'#3f5a72',ink:'#1e2e3c',sub:'#5f7586',sel:'#d0502b'},
+  {k:'yoru',label:'夜',bg:'#23211f',card:'#33302c',stroke:'#4d4842',line:'#a89c8e',ink:'#f1ebe2',sub:'#b2a698',sel:'#e8a33d'},
+  {k:'kokuban',label:'黒板',bg:'#2f4a3c',card:'#3b5a4a',stroke:'#5d7d6c',line:'#e9efe6',ink:'#f6f7f2',sub:'#c9d6cc',sel:'#f2d14b'},
+];
+const SEXCS=[
+  {k:'std',label:'標準',m:'#4a74a8',f:'#c0567a',u:'#e0b02a'},
+  {k:'wa',label:'和色',m:'#264a82',f:'#b7282e',u:'#e6b422'},
+  {k:'pastel',label:'パステル',m:'#8fb3de',f:'#efa3b8',u:'#f2d36b'},
+  {k:'mono',label:'モノクロ',m:'#4a4a4a',f:'#9a9a9a',u:'#d0d0d0'},
+  {k:'none',label:'色分けしない'},
+];
+const SKEY='kakeizu-webapp-settings';
+let settings={font:'auto',theme:'kinari',sexc:'std',datefmt:'w',eraShort:false,eto:false,adoptLine:'dash'};
+try{Object.assign(settings,JSON.parse(localStorage.getItem(SKEY)||'{}'));}catch(e){}
+const fontDef=()=>FONTS.find(f=>f.k===settings.font)||FONTS[0];
+const theme=()=>THEMES.find(t=>t.k===settings.theme)||THEMES[0];
+const sexColors=()=>{const c=SEXCS.find(s=>s.k===settings.sexc)||SEXCS[0];return c.m?c:null;};
+function fontStack(V){const f=fontDef();if(f.k==='auto')return V?SERIF:SANS;if(f.stack)return f.stack;return `"${f.family}",${f.base}`;}
+function loadWebFont(f){
+  if(!f||!f.gf)return Promise.resolve();
+  const id='gf-'+f.k;
+  if(!document.getElementById(id)){const l=document.createElement('link');l.id=id;l.rel='stylesheet';
+    l.href=`https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;document.head.appendChild(l);}
+  return document.fonts.load(`700 16px "${f.family}"`,'山田あ').catch(()=>{});
+}
+function applySettings(){
+  const t=theme();$('#stage').style.background=t.bg;
+  const f=fontDef();if(f.gf)loadWebFont(f).then(()=>renderTree());
+  try{localStorage.setItem(SKEY,JSON.stringify(settings));}catch(e){}
+}
+function openSettings(){
+  FONTS.forEach(loadWebFont);
+  const fb=$('#setFont');fb.innerHTML='';
+  FONTS.forEach(f=>{const b=document.createElement('button');b.className='opt'+(settings.font===f.k?' on':'');
+    const st=f.k==='auto'?SANS:f.stack||`"${f.family}",${f.base}`;
+    b.innerHTML=`<span class="smp" style='font-family:${st}'>山田 源一郎</span><span class="ol">${esc(f.label)}</span><span class="on2">${esc(f.note||'')}</span>`;
+    b.onclick=()=>{settings.font=f.k;applySettings();renderTree();openSettings();};fb.appendChild(b);});
+  const tb=$('#setTheme');tb.innerHTML='';
+  THEMES.forEach(t=>{const b=document.createElement('button');b.className='opt sw'+(settings.theme===t.k?' on':'');
+    b.innerHTML=`<span class="chip" style="background:${t.bg};border-color:${t.stroke}"><i style="background:${t.card};border-color:${t.stroke}"></i></span><span class="ol">${t.label}</span>`;
+    b.onclick=()=>{settings.theme=t.k;applySettings();renderTree();openSettings();};tb.appendChild(b);});
+  const sb=$('#setSex');sb.innerHTML='';
+  SEXCS.forEach(c=>{const b=document.createElement('button');b.className='opt sx'+(settings.sexc===c.k?' on':'');
+    b.innerHTML=(c.m?`<span class="bars"><i style="background:${c.m}"></i><i style="background:${c.f}"></i><i style="background:${c.u}"></i></span>`:'<span class="bars none">—</span>')+`<span class="ol">${c.label}</span>`;
+    b.onclick=()=>{settings.sexc=c.k;applySettings();render();openSettings();};sb.appendChild(b);});
+  const ab=$('#setAdopt');ab.innerHTML='';
+  [['dash','点線','洋式・ジェノグラム'],['double','二重線','日本の系図・資料集']].forEach(([k,l,n])=>{const b=document.createElement('button');b.className='opt sw'+((settings.adoptLine||'dash')===k?' on':'');
+    b.innerHTML=`<svg width="40" height="30"><path d="${k==='double'?'M17 2V28M23 2V28':'M20 2V28'}" stroke="#555" stroke-width="1.6" ${k==='dash'?'stroke-dasharray="4 3"':''} fill="none"/></svg><span class="ol">${l}</span><span class="on2">${n}</span>`;
+    b.onclick=()=>{settings.adoptLine=k;applySettings();render();openSettings();};ab.appendChild(b);});
+  const db=$('#setDate');db.innerHTML='';const smp={src:'w',y:1975,m:3,d:2};
+  DFMTS.forEach(d=>{const b=document.createElement('button');b.className='opt'+((settings.datefmt||'w')===d.k?' on':'');
+    b.innerHTML=`<span class="ol" style="font-size:14px;font-weight:700">${esc(fmtDate(smp,{fmt:d.k}))}</span><span class="on2">${d.label}</span>`;
+    b.onclick=()=>{settings.datefmt=d.k;applySettings();render();openSettings();};db.appendChild(b);});
+  $('#setShort').checked=!!settings.eraShort;$('#setRuby').checked=!!settings.ruby;$('#setWiz').checked=settings.wizard!==false;$('#setEto').checked=!!settings.eto;
+  $('#settings').classList.add('open');
+}
+
+let S={persons:{},families:[]};
+let ui={sel:null,view:'all',dir:'h',focus:null,expand:false,depth:4,fan:false,rel:true};
+let undoStack=[],redoStack=[];
+let view={s:1,x:0,y:0};
+let last={pos:new Map(),bbox:null};
+
+/* ---------- データ ---------- */
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function newPerson(o){const p=Object.assign({id:uid('p'),sei:'',mei:'',seiYomi:'',meiYomi:'',sex:'u',bd:null,dd:null,living:true,note:''},o||{});S.persons[p.id]=p;return p;}
+const P=id=>S.persons[id];
+const spouseFams=id=>S.families.filter(f=>f.spouses.includes(id));
+// 関係の種類
+const CT_LABEL={bio:'実子',adopt:'養子',special:'特別養子',step:'継子（連れ子）',ninchi:'認知（婚外子）',yushi:'猶子'};
+const CT_MARK={adopt:'養',special:'特養',step:'継',ninchi:'認知',yushi:'猶'};
+const KIND_LABEL={m:'婚姻',d:'離婚',n:'内縁・事実婚',w:'死別'};
+const CT_PRI={special:0,bio:1,adopt:2,yushi:3,ninchi:4,step:5};
+const ctype=(f,c)=>(f.ct&&f.ct[c])||'bio';
+const childFams=id=>S.families.filter(f=>f.children.includes(id));
+function primaryFam(id){const fs=childFams(id);if(!fs.length)return undefined;const p=P(id);
+  if(p&&p.mainFam){const m=fs.find(f=>f.id===p.mainFam);if(m)return m;}
+  return fs.slice().sort((a,b)=>CT_PRI[ctype(a,id)]-CT_PRI[ctype(b,id)])[0];}
+const parentFam=primaryFam;
+const hiddenLink=(f,c)=>ctype(f,c)==='bio'&&childFams(c).some(g=>ctype(g,c)==='special');
+const circ=n=>'①②③④⑤⑥⑦⑧⑨'[n-1]||String(n);
+const stOf=t=>t==='bio'?'s':(t==='adopt'||t==='special')?(settings.adoptLine==='double'?'w':'d'):t==='yushi'?'dd':'d';
+function dispName(p,sep){const g=p.mei||(p.sex==='f'?'女子':'某');return p.sei?p.sei+sep+g:g;}
+const nameOf=p=>dispName(p,' ');
+const fullYomi=p=>{const a=[p.seiYomi,p.meiYomi].filter(Boolean).join(' ');return a||(p.yomi||'');};
+// 享年から生年を推定（数え年が基本）
+function birthDt(p){
+  if(p.bd)return p.bd;
+  const k=parseInt(String(p.kyonen||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)),10);
+  if(!(k>0)||!p.dd)return null;
+  const I=dateInfo(p.dd,calOf(p));if(!I)return null;
+  return{src:'w',y:I.wy-k+(p.kazoe==='man'?0:1),est:true};
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const toHalf=s=>String(s==null?'':s).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+
+function snapshot(){undoStack.push(JSON.stringify(S));if(undoStack.length>300)undoStack.shift();redoStack=[];updTop();}
+function undo(){if(!undoStack.length)return;redoStack.push(JSON.stringify(S));S=JSON.parse(undoStack.pop());fixSel();save();render(true);}
+function redo(){if(!redoStack.length)return;undoStack.push(JSON.stringify(S));S=JSON.parse(redoStack.pop());fixSel();save();render(true);}
+function fixSel(){if(ui.sel&&!P(ui.sel))ui.sel=null;if(ui.focus&&!P(ui.focus))ui.focus=null;}
+function cleanFamilies(){S.families=S.families.filter(f=>f.spouses.length>=2||(f.spouses.length>=1&&f.children.length>=1)||f.children.length>=2);
+  S.families.forEach(f=>{if(f.ct)Object.keys(f.ct).forEach(c=>{if(!f.children.includes(c))delete f.ct[c];});});}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify({S,ui:{view:ui.view,dir:ui.dir,depth:ui.depth,fan:ui.fan,rel:ui.rel}}))}catch(e){}},200);}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&d.S&&d.S.persons){S=d.S;if(d.ui){ui.view=d.ui.view||'all';ui.dir=d.ui.dir||'h';ui.depth=d.ui.depth||4;ui.fan=!!d.ui.fan;ui.rel=d.ui.rel!==false;}}}catch(e){}}
+
+/* ---------- 追加・削除 ---------- */
+function afterAdd(id,origin,rel){cleanFamilies();save();ui.sel=id;ui.expand=true;
+  if(settings.wizard!==false){startWizard(id,origin,rel);ensureVisible(id);return;}
+  render();openEditor(true);ensureVisible(id);}
+function addParent(id){
+  const p=P(id);let f=parentFam(id);
+  if(f&&f.spouses.length>=2){toast('両親はもう2人登録されています');return;}
+  snapshot();
+  const other=f&&f.spouses.length?P(f.spouses[0]).sex:null;
+  const sex=other==='m'?'f':'m';
+  const np=newPerson({sex,sei:sex==='m'?p.sei:'',seiYomi:sex==='m'?(p.seiYomi||''):''});
+  if(!f){f={id:uid('f'),spouses:[],children:[id]};S.families.push(f);}
+  f.spouses.push(np.id);afterAdd(np.id,'parent',id);
+}
+function addSpouse(id){
+  const p=P(id);snapshot();
+  const np=newPerson({sex:p.sex==='m'?'f':p.sex==='f'?'m':'u'});
+  const f=spouseFams(id).find(f=>f.spouses.length===1);
+  if(f)f.spouses.push(np.id);else S.families.push({id:uid('f'),spouses:[id,np.id],children:[]});
+  afterAdd(np.id,'spouse',id);
+}
+function addChild(id){
+  const fams=spouseFams(id);
+  if(fams.length>1){
+    chooser('誰との子ですか？',fams.map(f=>{const o=f.spouses.filter(s=>s!==id);return{label:o.length?o.map(s=>nameOf(P(s))).join('・')+' との子':'相手不明の子',fn:()=>doAddChild(id,f)};}));
+  }else doAddChild(id,fams[0]||null);
+}
+function doAddChild(id,f){
+  snapshot();
+  const p=P(id);
+  const dad=f?f.spouses.map(P).find(x=>x.sex==='m'):null;
+  const np=newPerson({sei:(dad||p).sei,seiYomi:(dad||p).seiYomi||''});
+  if(!f){f={id:uid('f'),spouses:[id],children:[]};S.families.push(f);}
+  f.children.push(np.id);afterAdd(np.id,'child',id);
+}
+function addSibling(id){
+  const p=P(id);snapshot();
+  let f=parentFam(id);
+  if(!f){f={id:uid('f'),spouses:[],children:[id]};S.families.push(f);}
+  const np=newPerson({sei:p.sei,seiYomi:p.seiYomi||''});
+  f.children.splice(f.children.indexOf(id)+1,0,np.id);afterAdd(np.id,'sibling',id);
+}
+function delPerson(id){
+  const nm=nameOf(P(id));snapshot();
+  delete S.persons[id];
+  S.families.forEach(f=>{f.spouses=f.spouses.filter(x=>x!==id);f.children=f.children.filter(x=>x!==id);});
+  cleanFamilies();fixSel();ui.sel=null;save();render();
+  toast(`「${nm}」を削除しました`,'元に戻す',undo);
+}
+function moveSib(id,d){
+  const f=parentFam(id);if(!f)return;const i=f.children.indexOf(id),j=i+d;
+  if(j<0||j>=f.children.length)return;snapshot();
+  [f.children[i],f.children[j]]=[f.children[j],f.children[i]];save();render();
+}
+
+/* ---------- 表示する人 ---------- */
+function visibleIds(){
+  const all=Object.keys(S.persons);
+  if(ui.view==='all'||!all.length)return all;
+  const F=P(ui.focus)?ui.focus:(P(ui.sel)?ui.sel:all[0]);ui.focus=F;
+  if(ui.view==='anc'){const st=ancSet(F,ui.depth||4);return all.filter(x=>st.has(x));}
+  if(ui.view==='desc'){const st=descSet(F,ui.depth||4);return all.filter(x=>st.has(x));}
+  relMap=new Map();
+  const set=new Set([F]);
+  const parentsOf=x=>{const f=parentFam(x);return f?f.spouses:[];};
+  parentsOf(F).forEach(a=>{set.add(a);parentsOf(a).forEach(b=>set.add(b));});
+  const pf=parentFam(F);if(pf)pf.children.forEach(c=>set.add(c));
+  spouseFams(F).forEach(f=>{f.spouses.forEach(s=>set.add(s));f.children.forEach(c=>{set.add(c);spouseFams(c).forEach(g=>g.spouses.forEach(s=>set.add(s)));spouseFams(c).forEach(g=>g.children.forEach(gc=>set.add(gc)));});});
+  return all.filter(x=>set.has(x));
+}
+
+/* ---------- 自動レイアウト ---------- */
+function computeLayout(ids,fams){
+  const adj=new Map(ids.map(i=>[i,[]]));
+  const link=(a,b,d)=>{adj.get(a).push([b,d]);adj.get(b).push([a,-d]);};
+  fams.forEach(f=>{
+    if(f.spouses.length){const s0=f.spouses[0];f.spouses.slice(1).forEach(s=>link(s0,s,0));f.children.forEach(c=>link(s0,c,1));}
+    else{const c0=f.children[0];f.children.slice(1).forEach(c=>link(c0,c,0));}
+  });
+  const gen=new Map(),comps=[];
+  ids.forEach(id=>{
+    if(gen.has(id))return;
+    const comp=[id],q=[id];gen.set(id,0);
+    while(q.length){const a=q.shift();adj.get(a).forEach(([b,d])=>{if(!gen.has(b)){gen.set(b,gen.get(a)+d);comp.push(b);q.push(b);}});}
+    const mn=Math.min(...comp.map(x=>gen.get(x)));comp.forEach(x=>gen.set(x,gen.get(x)-mn));
+    comps.push(comp);
+  });
+  const pos=new Map();let off=0;
+  comps.forEach(comp=>{
+    const r=layoutComp(comp,gen,fams);let mx=-Infinity;
+    r.forEach((u,id)=>{pos.set(id,{u:u+off,g:gen.get(id)});if(u>mx)mx=u;});
+    off+=mx+CW/2+100;
+  });
+  return pos;
+}
+function layoutComp(cids,gen,fams){
+  const inC=new Set(cids);
+  const cf=fams.filter(f=>f.spouses.some(x=>inC.has(x))||f.children.some(x=>inC.has(x)));
+  const childFam=new Map(),spF=new Map(),spAdj=new Map(cids.map(i=>[i,new Set()]));
+  cf.forEach(f=>{
+    f.children.forEach(c=>{if(!childFam.has(c))childFam.set(c,f);});
+    f.spouses.forEach(s=>{if(!spF.has(s))spF.set(s,[]);spF.get(s).push(f);});
+    for(let i=0;i<f.spouses.length;i++)for(let j=i+1;j<f.spouses.length;j++){
+      const a=f.spouses[i],b=f.spouses[j];
+      if(gen.get(a)===gen.get(b)){spAdj.get(a).add(b);spAdj.get(b).add(a);}
+    }
+  });
+  // 夫婦をひとまとまり（ユニット）に
+  const unitOf=new Map(),units=[];
+  cids.forEach(id=>{
+    if(unitOf.has(id))return;
+    const grp=[],st=[id],seen=new Set([id]);
+    while(st.length){const a=st.pop();grp.push(a);spAdj.get(a).forEach(b=>{if(!seen.has(b)){seen.add(b);st.push(b);}});}
+    const start=grp.find(x=>spAdj.get(x).size<=1)||grp[0];
+    const m=[],vis=new Set();let cur=start;
+    while(cur&&!vis.has(cur)){vis.add(cur);m.push(cur);cur=[...spAdj.get(cur)].find(x=>!vis.has(x));}
+    grp.forEach(x=>{if(!vis.has(x))m.push(x);});
+    if(m.length===2&&P(m[1]).sex==='m'&&P(m[0]).sex!=='m')m.reverse();
+    const u={m,g:gen.get(id),rank:0,left:0,w:m.length*CW+(m.length-1)*SG};
+    m.forEach(x=>unitOf.set(x,u));units.push(u);
+  });
+  // 初期の並び順（家系をたどった順）
+  const rank=new Map();let r=0;
+  const visit=id=>{
+    if(rank.has(id))return;rank.set(id,r++);
+    unitOf.get(id).m.forEach(visit);
+    (spF.get(id)||[]).forEach(f=>f.children.forEach(c=>{if(inC.has(c))visit(c);}));
+  };
+  cids.filter(x=>!childFam.has(x)).forEach(visit);cids.forEach(visit);
+  units.forEach(u=>u.rank=Math.min(...u.m.map(x=>rank.get(x))));
+  const maxG=Math.max(...units.map(u=>u.g));
+  const levels=[];for(let g=0;g<=maxG;g++)levels.push(units.filter(u=>u.g===g).sort((a,b)=>a.rank-b.rank));
+  let ip=new Map();
+  const idx=()=>{ip=new Map();levels.forEach(L=>{let k=0;L.forEach(u=>u.m.forEach(x=>ip.set(x,k++)));});};
+  idx();
+  const down=()=>{for(let g=1;g<=maxG;g++){const L=levels[g];
+    L.forEach(u=>{const vals=[];let sib=1e9;
+      u.m.forEach(x=>{const f=childFam.get(x);if(!f)return;
+        const ps=f.spouses.filter(s=>ip.has(s)&&gen.get(s)<g);if(ps.length)vals.push(avg(ps.map(s=>ip.get(s))));
+        else{const ob=f.children.filter(c=>ip.has(c)&&!u.m.includes(c));if(ob.length)vals.push(avg(ob.map(c=>ip.get(c))));}
+        const si=f.children.indexOf(x);if(si<sib)sib=si;});
+      u.key=vals.length?avg(vals):ip.get(u.m[0]);u.sib=sib;});
+    L.sort((a,b)=>a.key-b.key||a.sib-b.sib||a.rank-b.rank);idx();}};
+  const up=()=>{for(let g=maxG-1;g>=0;g--){const L=levels[g];
+    L.forEach(u=>{const vals=[];
+      u.m.forEach(x=>(spF.get(x)||[]).forEach(f=>f.children.forEach(c=>{if(ip.has(c)&&gen.get(c)>g)vals.push(ip.get(c));})));
+      u.key=vals.length?avg(vals):ip.get(u.m[0]);});
+    L.sort((a,b)=>a.key-b.key||a.rank-b.rank);idx();}};
+  down();for(let i=0;i<3;i++){up();down();}
+  // 座標
+  const step=CW+SG;
+  const xOf=x=>{const u=unitOf.get(x);return u.left+u.m.indexOf(x)*step+CW/2;};
+  const famKey=u=>{for(const x of u.m){const f=childFam.get(x);if(f)return f;}return null;};
+  const gapB=(a,b)=>{const fa=famKey(a);return fa&&fa===famKey(b)?30:60;};
+  levels.forEach(L=>{let x=0;L.forEach((u,i)=>{if(i)x+=gapB(L[i-1],u);u.left=x;x+=u.w;});});
+  const place=(L,d)=>{const n=L.length;if(!n)return;const L1=[],L2=[];
+    L1[0]=d[0];for(let i=1;i<n;i++)L1[i]=Math.max(d[i],L1[i-1]+L[i-1].w+gapB(L[i-1],L[i]));
+    L2[n-1]=d[n-1];for(let i=n-2;i>=0;i--)L2[i]=Math.min(d[i],L2[i+1]-L[i].w-gapB(L[i],L[i+1]));
+    L.forEach((u,i)=>u.left=(L1[i]+L2[i])/2);};
+  const cdown=()=>{for(let g=1;g<=maxG;g++){const L=levels[g];
+    place(L,L.map(u=>{const sh=[];
+      u.m.forEach((x,k)=>{const f=childFam.get(x);if(!f)return;const ps=f.spouses.filter(s=>gen.get(s)<g);
+        if(ps.length)sh.push(avg(ps.map(xOf))-(k*step+CW/2));
+        else{const ob=f.children.filter(c=>inC.has(c)&&!u.m.includes(c));if(ob.length)sh.push(avg(ob.map(xOf))-(k*step+CW/2));}});
+      return sh.length?avg(sh):u.left;}));}};
+  const cup=()=>{for(let g=maxG-1;g>=0;g--){const L=levels[g];
+    place(L,L.map(u=>{const sh=[],done=new Set();
+      u.m.forEach(x=>(spF.get(x)||[]).forEach(f=>{if(done.has(f))return;done.add(f);
+        const cs=f.children.filter(c=>inC.has(c)&&gen.get(c)>g).map(xOf);if(!cs.length)return;
+        const sp=f.spouses.filter(s=>gen.get(s)===g);if(!sp.length)return;
+        sh.push(u.left+(Math.min(...cs)+Math.max(...cs))/2-avg(sp.map(xOf)));}));
+      return sh.length?avg(sh):u.left;}));}};
+  cdown();for(let i=0;i<6;i++){cup();cdown();}
+  const mn=Math.min(...units.map(u=>u.left));units.forEach(u=>u.left-=mn);
+  const out=new Map();cids.forEach(x=>out.set(x,xOf(x)));return out;
+}
+
+/* ---------- 描画 ---------- */
+const KNUM='〇一二三四五六七八九';
+const toKan=s=>String(s).replace(/[0-9]/g,d=>KNUM[d]);
+function dateLines(p,vert){
+  const L=dateLines0(p,vert);if(p.early){if(L.length)L[L.length-1]+=(vert?'':' ')+'早世';else L.push('早世');}return L;
+}
+function dateLines0(p,vert){
+  const o={yearOnly:true,vert,cal:calOf(p)};const bd=birthDt(p);
+  const b=fmtDate(bd,o);
+  if(p.living)return b?[b+'生']:[];
+  const d=fmtDate(p.dd,o);
+  if(!b&&!d)return [];
+  const bare=(settings.datefmt||'w')==='w'&&!vert;
+  const one=bare?`${fmtDate(bd,{...o,bare:true})||'?'}–${fmtDate(p.dd,{...o,bare:true})||'?'}`:(vert?`${b||'？'}｜${d||'？'}`:`${b||'?'}–${d||'?'}`);
+  if([...one].length<=(vert?12:14))return [one];
+  return [(b||'？')+'生',(d||'？')+'没'];
+}
+const textW=(t,fs)=>[...t].reduce((w,c)=>w+(c.charCodeAt(0)<256?0.56:1)*fs,0);
+function drawTree(opt){
+  opt=opt||{};
+  if(ui.view==='scroll')return drawScroll(opt);
+  if(ui.view==='anc'&&ui.fan)return drawFan(opt);
+  const dir=ui.dir,V=dir==='v';
+  const ids=visibleIds();
+  if(!ids.length)return{svg:'',bbox:null,pos:new Map()};
+  const set=new Set(ids);
+  const prim=new Map();ids.forEach(id=>{const f=primaryFam(id);if(f)prim.set(id,f);});
+  const okF=x=>x.spouses.length>=2||(x.spouses.length>=1&&(x.children.length+(x.extra||[]).length)>=1)||x.children.length>=2;
+  const fams=S.families.map(f=>{const sp=f.spouses.filter(x=>set.has(x)),chA=f.children.filter(x=>set.has(x));
+      return{f,spouses:sp,children:chA.filter(c=>prim.get(c)===f),extra:chA.filter(c=>prim.get(c)!==f&&!hiddenLink(f,c))};}).filter(okF);
+  const lay=computeLayout(ids,fams.map(x=>({spouses:x.spouses,children:x.children})).filter(okF));
+  const GG=V?120:140;
+  const M=(u,v)=>V?[-v,u]:[u,v];
+  const vOf=g=>g*GG;
+  const T=theme();
+  const PB={s:'',d:''},labels=[];
+  const raw=(b,u1,v1,u2,v2)=>{const a=M(u1,v1),c=M(u2,v2);PB[b]+=`M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${c[0].toFixed(1)} ${c[1].toFixed(1)}`;};
+  const seg=(st,u1,v1,u2,v2)=>{
+    if(st==='w'||st==='dd'){const b=st==='w'?'s':'d';
+      if(Math.abs(u1-u2)<0.01){raw(b,u1-2.2,v1,u2-2.2,v2);raw(b,u1+2.2,v1,u2+2.2,v2);}else{raw(b,u1,v1-2.2,u2,v2-2.2);raw(b,u1,v1+2.2,u2,v2+2.2);}}
+    else raw(st,u1,v1,u2,v2);};
+  // 子どもへの横線（バス）が重なる家族は、高さをずらす（レーン分け）
+  const geo=x=>{const sp=x.spouses.map(id=>({id,...lay.get(id)})).filter(q=>q.u!==undefined).sort((a,b)=>a.u-b.u);
+    let ou=null,ov=0,pg;
+    if(sp.length>=2){ou=avg(sp.map(s=>s.u));pg=sp[0].g;ov=vOf(pg)+3;}
+    else if(sp.length===1){ou=sp[0].u;pg=sp[0].g;ov=vOf(pg)+CH/2;}
+    return{sp,ou,ov,pg};};
+  const laneOf=new Map();{const byG=new Map();
+    fams.forEach((x,fi)=>{if(!x.children.length)return;const G=geo(x);
+      const ks=x.children.map(c=>lay.get(c)).filter(Boolean);if(!ks.length)return;
+      const kids=ks.map(k=>k.u),us=kids.slice();
+      let pg=G.pg;if(pg===undefined)pg=Math.min(...ks.map(k=>k.g))-1;
+      if(G.ou!==null)us.push(G.ou);
+      if(!byG.has(pg))byG.set(pg,[]);byG.get(pg).push({fi,mn:Math.min(...us),mx:Math.max(...us),c:G.ou,kids});});
+    // XをYより上の段に置いたときの交差数：Xの子への縦線がYの横線をまたぐ数＋Yの親からの縦線がXの横線をまたぐか
+    const inS=(u,b)=>u>b.mn+0.5&&u<b.mx-0.5;
+    const cost=(X,Y)=>X.kids.filter(u=>inS(u,Y)).length+(Y.c!==null&&inS(Y.c,X)?1:0);
+    const perms=a=>a.length<=1?[a]:a.flatMap((x,i)=>perms([...a.slice(0,i),...a.slice(i+1)]).map(r=>[x,...r]));
+    byG.forEach(list=>{list.sort((a,b)=>a.mn-b.mn||a.mx-b.mx);
+      // 横に重なるものどうしをひとかたまりに
+      const cl=[];let cur=null,end=-1e9;
+      list.forEach(it=>{if(!cur||it.mn>end-10){cur=[];cl.push(cur);end=-1e9;}cur.push(it);end=Math.max(end,it.mx);});
+      cl.forEach(g=>{const n=g.length;
+        if(n===1){laneOf.set(g[0].fi,0);return;}
+        let best=g,bc=1e9;
+        const tot=o=>{let t=0;for(let i=0;i<o.length;i++)for(let j=i+1;j<o.length;j++)if(o[i].mx>o[j].mn-10&&o[j].mx>o[i].mn-10)t+=cost(o[i],o[j]);return t;};
+        if(n<=6)perms(g).forEach(o=>{const t=tot(o);if(t<bc){bc=t;best=o;}});
+        else best=g.slice().sort((a,b)=>cost(a,b)-cost(b,a));
+        const sp=Math.min(14,(GG-CH-16)/(n-1));
+        best.forEach((it,l)=>laneOf.set(it.fi,(l-(n-1)/2)*sp));});});}
+  fams.forEach((x,fi)=>{
+    const f=x.f,kind=f.kind||'m';
+    const sp=x.spouses.map(id=>({id,...lay.get(id)})).filter(q=>q.u!==undefined).sort((a,b)=>a.u-b.u);
+    for(let i=0;i+1<sp.length;i++){const a=sp[i],b=sp[i+1];
+      if(a.g===b.g){const v=vOf(a.g);const u1=a.u+CW/2,u2=b.u-CW/2;
+        if(u2>u1){const bb=kind==='n'?'d':'s';raw(bb,u1,v-3,u2,v-3);raw(bb,u1,v+3,u2,v+3);
+          const um=(u1+u2)/2;
+          if(kind==='d'){raw('s',um-6,v+8,um,v-8);raw('s',um,v+8,um+6,v-8);}
+          if(f.no)labels.push({u:um,v:v-10,t:circ(f.no),a:'middle'});}}
+      else raw(kind==='n'?'d':'s',a.u,vOf(a.g),b.u,vOf(b.g));}
+    let {ou,ov,pg}=geo(x);
+    if(x.children.length){
+      const ch=x.children.map(c=>({c,...lay.get(c),t:ctype(f,c)}));ch.forEach(k=>k.st=stOf(k.t));
+      if(pg===undefined)pg=Math.min(...ch.map(c=>c.g))-1;
+      const sts=[...new Set(ch.map(k=>k.st))],fst=sts.length===1?sts[0]:'s';
+      const busV=vOf(pg)+CH/2+(GG-CH)/2+(laneOf.get(fi)||0);
+      if(ou!==null)seg(fst,ou,ov,ou,busV);
+      const us=ch.map(c=>c.u);if(ou!==null)us.push(ou);
+      const mn=Math.min(...us),mx=Math.max(...us);
+      if(mx>mn)seg(fst,mn,busV,mx,busV);
+      ch.forEach(k=>{seg(k.st,k.u,busV,k.u,vOf(k.g)-CH/2);if(CT_MARK[k.t])labels.push({u:k.u+7,v:vOf(k.g)-CH/2-7,t:CT_MARK[k.t]});});
+    }
+    if(ou!==null)x.extra.forEach(c=>{const k=lay.get(c);if(!k)return;const t=ctype(f,c),st=stOf(t);
+      const vr=vOf(k.g)-CH/2-16,cu=k.u+14;
+      seg(st,ou,ov,ou,vr);seg(st,ou,vr,cu,vr);seg(st,cu,vr,cu,vOf(k.g)-CH/2);
+      if(CT_MARK[t])labels.push({u:cu+5,v:vr-4,t:CT_MARK[t]});});
+  });
+  let cards='',x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  const pos=new Map();
+  const font=fontStack(V);const SC=sexColors();
+  const stripe=s=>SC?SC[s]||SC.u:null;
+  ids.forEach(id=>{
+    const p=P(id),L=lay.get(id);const [cx,cy]=M(L.u,vOf(L.g));
+    const w=V?CH:CW,h=V?CW:CH,x=cx-w/2,y=cy-h/2;
+    pos.set(id,{x:cx,y:cy});
+    x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+w);y1=Math.max(y1,y+h);
+    const sel=opt.sel===id;
+    const hide=p.living&&opt.hide;
+    let nm=hide==='anon'?'存命の方':dispName(p,V?'':' ');
+    const dls=hide?[]:dateLines(p,V);const dt=dls.length;
+    let g=`<g data-id="${id}" style="cursor:pointer"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${T.card}" stroke="${sel?T.sel:T.stroke}" stroke-width="${sel?3:1.2}"/>`;
+    if(SC)g+=V?`<rect x="${x+6}" y="${y}" width="${w-12}" height="5" rx="2" fill="${stripe(p.sex)}"/>`
+        :`<rect x="${x}" y="${y+6}" width="5" height="${h-12}" rx="2" fill="${stripe(p.sex)}"/>`;
+    if(!V){
+      const MW=106,TL=(t,f,mw)=>textW(t,f)>(mw||MW)?` textLength="${mw||MW}" lengthAdjust="spacingAndGlyphs"`:'';
+      const ry=settings.ruby&&hide!=='anon'?fullYomi(p):'';
+      const sp=nm.indexOf(' ');
+      // 1行に収まる大きさを探す。13pxでも入らなければ、名字と名前で2行に分ける
+      let fs=15;while(fs>13&&textW(nm,fs)>MW)fs--;
+      const two=textW(nm,fs)>MW&&sp>0;
+      if(!two){
+        const ny=dt===2?cy-8:dt?cy-2:cy+5;
+        if(ry)g+=`<text x="${cx+2}" y="${ny-fs-0.5}" text-anchor="middle" font-size="8.5" fill="${T.sub}"${TL(ry,8.5,104)}>${esc(ry)}</text>`;
+        g+=`<text x="${cx+2}" y="${ny}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="${T.ink}"${TL(nm,fs)}>${esc(nm)}</text>`;
+        const dfs=dt===2?10:11;
+        dls.forEach((t,i)=>{const yy=dt===2?cy+9+i*13:cy+17;g+=`<text x="${cx+2}" y="${yy}" text-anchor="middle" font-size="${dfs}" fill="${T.sub}"${TL(t,dfs)}>${esc(t)}</text>`;});
+      }else{
+        const L=[nm.slice(0,sp),nm.slice(sp+1)];
+        let f2=ry&&dls.length?12:14;while(f2>11&&Math.max(...L.map(t=>textW(t,f2)))>MW)f2--;
+        const d1=dls.join(' '),hasD=!!d1,rf=ry?7:0;
+        const y1=hasD?(ry?cy-9:cy-10):cy-2+rf/2,y2=y1+f2+1+(ry?rf:0);
+        if(ry){const rs=ry.split(/\s+/);const r1=rs[0]||'',r2=rs.slice(1).join('');
+          if(r1)g+=`<text x="${cx+2}" y="${y1-f2+0.5}" text-anchor="middle" font-size="7" fill="${T.sub}"${TL(r1,7,104)}>${esc(r1)}</text>`;
+          if(r2)g+=`<text x="${cx+2}" y="${y2-f2+0.5}" text-anchor="middle" font-size="7" fill="${T.sub}"${TL(r2,7,104)}>${esc(r2)}</text>`;}
+        L.forEach((t,i)=>{g+=`<text x="${cx+2}" y="${i?y2:y1}" text-anchor="middle" font-size="${f2}" font-weight="700" fill="${T.ink}"${TL(t,f2)}>${esc(t)}</text>`;});
+        if(hasD)g+=`<text x="${cx+2}" y="${Math.min(cy+24,y2+13)}" text-anchor="middle" font-size="10" fill="${T.sub}"${TL(d1,10)}>${esc(d1)}</text>`;
+      }
+    }else{
+      const chars=[...nm.replace(/ー/g,'｜').replace(/[（(]/g,'︵').replace(/[）)]/g,'︶')];
+      const avail=h-14;const fs=Math.min(15,Math.floor(avail/Math.max(chars.length,1)));
+      const nx=dt===2?cx+13:dt?cx+8:cx;let yy=y+10+fs;
+      const ny0=yy;chars.forEach(c=>{g+=`<text x="${nx}" y="${yy}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="${T.ink}">${esc(c)}</text>`;yy+=fs*1.02;});
+      const ry=settings.ruby&&hide!=='anon'?fullYomi(p).replace(/\s/g,''):'';
+      if(ry){const rc=[...ry],span=Math.max(chars.length*fs*1.02,rc.length*7.5),st=Math.min(8,span/rc.length);let ry2=ny0-fs+st;
+        rc.forEach(c=>{g+=`<text x="${nx+fs/2+3.5}" y="${ry2}" text-anchor="middle" font-size="6.5" fill="${T.sub}">${esc(c)}</text>`;ry2+=st;});}
+      dls.forEach((t,i)=>{const dc=vchars(t);const ds=Math.min(10,Math.floor((h-12)/dc.length));let dy=y+8+ds;const dx=dt===2?cx-5-i*13:cx-12;
+        dc.forEach(c=>{g+=`<text x="${dx}" y="${dy}" text-anchor="middle" font-size="${ds}" fill="${T.sub}">${esc(c)}</text>`;dy+=ds*1.05;});});
+    }
+    if(ui.rel&&(ui.view==='anc'||ui.view==='desc')&&relMap.get(id))g+=`<text x="${cx}" y="${y-5}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${T.sel}">${esc(relMap.get(id))}</text>`;
+    cards+=g+'</g>';
+  });
+  const lab=labels.map(l=>{const [lx,ly]=M(l.u,l.v);return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${l.a||'start'}" font-size="10" fill="${T.sub}">${esc(l.t)}</text>`;}).join('');
+  const svg=`<g font-family='${font}'><path d="${PB.s}" fill="none" stroke="${T.line}" stroke-width="1.6" stroke-linecap="round"/><path d="${PB.d}" fill="none" stroke="${T.line}" stroke-width="1.6" stroke-dasharray="5 4"/>${lab}${cards}</g>`;
+  return{svg,bbox:{x:x0,y:y0,w:x1-x0,h:y1-y0},pos};
+}
+
+/* ---------- 元号・西暦（日本・中国・朝鮮） ----------
+   元号データ：DILA時間規範資料庫をもとにした sanmiao（MIT License © Daniel Patrick Morgan）を整形。
+   朝鮮の独自元号は Wikipedia「Korean era name」の一覧による。明治以降の改元日は政府公表日。 */
+const ERA_RAW=[["大化","jp","日本",645,650,7,20,""],["白雉","jp","日本",650,654,3,25,""],["朱鳥","jp","日本",686,686,8,17,""],["大宝","jp","日本",701,704,5,7,""],["慶雲","jp","日本",704,708,6,21,""],["和銅","jp","日本",708,715,2,11,""],["霊亀","jp","日本",715,717,10,7,""],["養老","jp","日本",717,724,12,28,""],["神亀","jp","日本",724,729,3,7,""],["天平","jp","日本",729,749,10,31,""],["天平感宝","jp","日本",749,749,5,8,""],["天平勝宝","jp","日本",749,757,8,23,""],["天平宝字","jp","日本",757,765,9,12,""],["天平神護","jp","日本",765,767,2,5,""],["神護景雲","jp","日本",767,770,11,15,""],["宝亀","jp","日本",770,781,10,27,""],["天応","jp","日本",781,782,2,3,""],["延暦","jp","日本",782,806,10,4,""],["大同","jp","日本",806,810,6,12,""],["弘仁","jp","日本",810,824,10,24,""],["天長","jp","日本",824,834,2,12,""],["承和","jp","日本",834,848,2,18,""],["嘉祥","jp","日本",848,851,7,20,""],["仁寿","jp","日本",851,854,6,5,""],["斉衡","jp","日本",854,857,12,27,""],["天安","jp","日本",857,859,3,24,""],["貞観","jp","日本",859,877,5,24,""],["元慶","jp","日本",877,885,6,5,""],["仁和","jp","日本",885,889,3,15,""],["寛平","jp","日本",889,898,6,3,""],["昌泰","jp","日本",898,901,5,24,""],["延喜","jp","日本",901,923,7,20,""],["延長","jp","日本",923,931,6,3,""],["承平","jp","日本",931,938,5,21,""],["天慶","jp","日本",938,947,6,27,""],["天暦","jp","日本",947,957,5,20,""],["天徳","jp","日本",957,961,11,26,""],["応和","jp","日本",961,964,3,10,""],["康保","jp","日本",964,968,11,18,""],["安和","jp","日本",968,970,9,30,""],["天禄","jp","日本",970,974,5,7,""],["天延","jp","日本",973,976,1,21,""],["貞元","jp","日本",976,978,9,2,""],["天元","jp","日本",978,983,1,5,""],["永観","jp","日本",983,985,6,3,""],["寛和","jp","日本",985,987,5,24,""],["永延","jp","日本",987,989,6,7,""],["永祚","jp","日本",989,990,9,15,""],["正暦","jp","日本",990,995,8,9,""],["長徳","jp","日本",995,999,3,30,""],["長保","jp","日本",999,1004,2,6,""],["寛弘","jp","日本",1004,1012,8,14,""],["長和","jp","日本",1012,1017,2,14,""],["寛仁","jp","日本",1017,1021,5,27,""],["治安","jp","日本",1021,1024,3,23,""],["万寿","jp","日本",1024,1028,8,25,""],["長元","jp","日本",1028,1037,8,24,""],["長暦","jp","日本",1037,1040,5,15,""],["長久","jp","日本",1040,1044,12,22,""],["寛徳","jp","日本",1044,1046,12,22,""],["永承","jp","日本",1046,1053,5,28,""],["天喜","jp","日本",1053,1058,2,8,""],["康平","jp","日本",1058,1065,7,21,""],["治暦","jp","日本",1065,1069,3,23,""],["延久","jp","日本",1069,1074,5,12,""],["承保","jp","日本",1074,1077,9,22,""],["承暦","jp","日本",1077,1081,12,11,""],["永保","jp","日本",1081,1084,3,28,""],["応徳","jp","日本",1084,1087,3,21,""],["寛治","jp","日本",1087,1094,5,17,""],["嘉保","jp","日本",1094,1096,1,29,""],["永長","jp","日本",1096,1097,1,9,""],["承徳","jp","日本",1097,1099,1,2,""],["康和","jp","日本",1099,1104,9,21,""],["長治","jp","日本",1104,1106,3,16,""],["嘉承","jp","日本",1106,1108,5,20,""],["天仁","jp","日本",1108,1110,9,16,""],["天永","jp","日本",1110,1113,8,7,""],["永久","jp","日本",1113,1118,9,1,""],["元永","jp","日本",1118,1120,5,2,""],["保安","jp","日本",1120,1124,5,16,""],["天治","jp","日本",1124,1126,5,25,""],["大治","jp","日本",1126,1131,2,22,""],["天承","jp","日本",1131,1132,3,8,""],["長承","jp","日本",1132,1135,9,28,""],["保延","jp","日本",1135,1141,6,17,""],["永治","jp","日本",1141,1142,8,20,""],["康治","jp","日本",1142,1144,6,1,""],["天養","jp","日本",1144,1145,4,4,""],["久安","jp","日本",1145,1151,8,19,""],["仁平","jp","日本",1151,1154,2,21,""],["久寿","jp","日本",1154,1156,12,11,""],["保元","jp","日本",1156,1159,5,25,""],["平治","jp","日本",1159,1160,5,16,""],["永暦","jp","日本",1160,1161,2,25,""],["応保","jp","日本",1161,1163,10,1,""],["長寛","jp","日本",1163,1165,5,11,""],["永万","jp","日本",1165,1166,7,21,""],["仁安","jp","日本",1166,1169,9,30,""],["嘉応","jp","日本",1169,1171,5,13,""],["承安","jp","日本",1171,1175,6,3,""],["安元","jp","日本",1175,1177,8,23,""],["治承","jp","日本",1177,1181,9,5,""],["養和","jp","日本",1181,1182,9,1,""],["寿永","jp","日本",1182,1185,7,6,""],["元暦","jp","日本",1184,1185,6,3,""],["文治","jp","日本",1185,1190,9,16,""],["建久","jp","日本",1190,1199,5,23,""],["正治","jp","日本",1199,1201,5,30,""],["建仁","jp","日本",1201,1204,3,26,""],["元久","jp","日本",1204,1206,3,30,""],["建永","jp","日本",1206,1207,6,12,""],["承元","jp","日本",1207,1211,11,23,""],["建暦","jp","日本",1211,1213,4,30,""],["建保","jp","日本",1213,1219,1,25,""],["承久","jp","日本",1219,1222,6,4,""],["貞応","jp","日本",1222,1224,6,1,""],["元仁","jp","日本",1224,1225,1,7,""],["嘉禄","jp","日本",1225,1227,6,4,""],["安貞","jp","日本",1227,1229,1,25,""],["寛喜","jp","日本",1229,1232,4,7,""],["貞永","jp","日本",1232,1233,4,30,""],["天福","jp","日本",1233,1234,6,1,""],["文暦","jp","日本",1234,1235,12,4,""],["嘉禎","jp","日本",1235,1238,11,8,""],["暦仁","jp","日本",1238,1239,1,6,""],["延応","jp","日本",1239,1240,3,20,""],["仁治","jp","日本",1240,1243,8,12,""],["寛元","jp","日本",1243,1247,3,25,""],["宝治","jp","日本",1247,1249,4,12,""],["建長","jp","日本",1249,1256,5,9,""],["康元","jp","日本",1256,1257,10,31,""],["正嘉","jp","日本",1257,1259,4,7,""],["正元","jp","日本",1259,1260,4,27,""],["文応","jp","日本",1260,1261,5,31,""],["弘長","jp","日本",1261,1264,3,29,""],["文永","jp","日本",1264,1275,4,3,""],["建治","jp","日本",1275,1278,5,29,""],["弘安","jp","日本",1278,1288,3,30,""],["正応","jp","日本",1288,1293,6,5,""],["永仁","jp","日本",1293,1299,9,13,""],["正安","jp","日本",1299,1302,6,1,""],["乾元","jp","日本",1302,1303,12,18,""],["嘉元","jp","日本",1303,1306,9,24,""],["徳治","jp","日本",1306,1308,1,26,""],["延慶","jp","日本",1308,1311,11,30,""],["応長","jp","日本",1311,1312,5,25,""],["正和","jp","日本",1312,1317,5,5,""],["文保","jp","日本",1317,1319,3,24,""],["元応","jp","日本",1319,1321,5,26,""],["元亨","jp","日本",1321,1324,3,30,""],["正中","jp","日本",1324,1326,1,2,""],["嘉暦","jp","日本",1326,1329,6,5,""],["元徳","jp","日本",1329,1332,9,30,"北朝"],["元弘","jp","日本",1331,1334,9,19,"南朝"],["正慶","jp","日本",1332,1333,5,31,"北朝"],["建武","jp","日本",1334,1336,3,13,""],["延元","jp","日本",1336,1340,4,18,"南朝"],["暦応","jp","日本",1338,1342,10,19,"北朝"],["興国","jp","日本",1340,1347,6,2,"南朝"],["康永","jp","日本",1342,1345,6,9,"北朝"],["貞和","jp","日本",1345,1350,11,23,"北朝"],["正平","jp","日本",1346,1370,2,20,"南朝"],["観応","jp","日本",1350,1352,4,12,"北朝"],["文和","jp","日本",1352,1356,11,12,"北朝"],["延文","jp","日本",1356,1361,5,7,"北朝"],["康安","jp","日本",1361,1362,5,12,"北朝"],["貞治","jp","日本",1362,1368,10,19,"北朝"],["応安","jp","日本",1368,1375,3,15,"北朝"],["建徳","jp","日本",1370,1372,8,24,"南朝"],["文中","jp","日本",1372,1375,6,10,"南朝"],["永和","jp","日本",1375,1379,4,6,"北朝"],["天授","jp","日本",1375,1381,7,4,"南朝"],["康暦","jp","日本",1379,1381,4,17,"北朝"],["弘和","jp","日本",1381,1384,3,14,"南朝"],["永徳","jp","日本",1381,1384,3,28,"北朝"],["至徳","jp","日本",1384,1387,3,27,"北朝"],["元中","jp","日本",1384,1392,6,15,"南朝"],["嘉慶","jp","日本",1387,1389,10,13,"北朝"],["康応","jp","日本",1389,1390,3,15,"北朝"],["明徳","jp","日本",1390,1394,4,20,""],["応永","jp","日本",1394,1428,8,10,""],["正長","jp","日本",1428,1429,6,19,""],["永享","jp","日本",1429,1441,10,12,""],["嘉吉","jp","日本",1441,1444,3,19,""],["文安","jp","日本",1444,1449,3,3,""],["宝徳","jp","日本",1449,1452,8,25,""],["享徳","jp","日本",1452,1455,8,19,""],["康正","jp","日本",1455,1457,9,15,""],["長禄","jp","日本",1457,1460,10,25,""],["寛正","jp","日本",1460,1466,1,31,""],["文正","jp","日本",1466,1467,3,17,""],["応仁","jp","日本",1467,1469,4,18,""],["文明","jp","日本",1469,1487,6,17,""],["長享","jp","日本",1487,1489,8,18,""],["延徳","jp","日本",1489,1492,9,25,""],["明応","jp","日本",1492,1501,8,21,""],["文亀","jp","日本",1501,1504,3,28,""],["永正","jp","日本",1504,1521,3,26,""],["大永","jp","日本",1521,1528,10,3,""],["享禄","jp","日本",1528,1532,7,16,""],["天文","jp","日本",1532,1555,9,8,""],["弘治","jp","日本",1555,1558,11,17,""],["永禄","jp","日本",1558,1570,3,28,""],["元亀","jp","日本",1570,1573,6,6,""],["天正","jp","日本",1573,1592,9,4,""],["文禄","jp","日本",1592,1596,1,10,""],["慶長","jp","日本",1596,1615,12,16,""],["元和","jp","日本",1615,1624,9,5,""],["寛永","jp","日本",1624,1644,4,17,""],["正保","jp","日本",1644,1648,1,13,""],["慶安","jp","日本",1648,1652,4,24,""],["承応","jp","日本",1652,1655,10,20,""],["明暦","jp","日本",1655,1658,5,18,""],["万治","jp","日本",1658,1661,8,21,""],["寛文","jp","日本",1661,1673,5,23,""],["延宝","jp","日本",1673,1681,10,30,""],["天和","jp","日本",1681,1684,11,9,""],["貞享","jp","日本",1684,1688,4,5,""],["元禄","jp","日本",1688,1704,10,23,""],["宝永","jp","日本",1704,1711,4,16,""],["正徳","jp","日本",1711,1716,6,11,""],["享保","jp","日本",1716,1736,8,9,""],["元文","jp","日本",1736,1741,5,31,""],["寛保","jp","日本",1741,1744,4,12,""],["延享","jp","日本",1744,1748,4,9,""],["寛延","jp","日本",1748,1751,8,5,""],["宝暦","jp","日本",1751,1764,12,14,""],["明和","jp","日本",1764,1772,6,30,""],["安永","jp","日本",1772,1781,12,10,""],["天明","jp","日本",1781,1789,4,25,""],["寛政","jp","日本",1789,1801,2,19,""],["享和","jp","日本",1801,1804,3,19,""],["文化","jp","日本",1804,1818,3,22,""],["文政","jp","日本",1818,1830,5,26,""],["天保","jp","日本",1830,1844,12,11,""],["弘化","jp","日本",1844,1848,1,9,""],["嘉永","jp","日本",1848,1854,4,1,""],["安政","jp","日本",1854,1860,1,15,""],["万延","jp","日本",1860,1861,4,8,""],["文久","jp","日本",1861,1864,2,19,""],["元治","jp","日本",1864,1865,3,27,""],["慶応","jp","日本",1865,1868,4,30,""],["建平","cn","北涼",437,439,5,22,""],["後元","cn","西漢",-162,-156,0,0,""],["中元","cn","西漢",-148,-143,0,0,""],["後元","cn","西漢",-142,-139,0,0,""],["建元","cn","西漢",-139,-134,0,0,""],["元光","cn","西漢",-133,-128,0,0,""],["元朔","cn","西漢",-127,-122,0,0,""],["元狩","cn","西漢",-121,-116,0,0,""],["元鼎","cn","西漢",-115,-110,0,0,""],["元封","cn","西漢",-109,-103,0,0,""],["太初","cn","西漢",-103,-100,0,0,""],["天漢","cn","西漢",-99,-96,0,0,""],["太始","cn","西漢",-95,-92,0,0,""],["征和","cn","西漢",-91,-88,0,0,""],["後元","cn","西漢",-87,-86,0,0,""],["始元","cn","西漢",-85,-79,0,0,""],["元鳳","cn","西漢",-79,-74,0,0,""],["元平","cn","西漢",-73,-72,0,0,""],["本始","cn","西漢",-72,-69,0,0,""],["地節","cn","西漢",-68,-65,0,0,""],["元康","cn","西漢",-64,-60,0,0,""],["神爵","cn","西漢",-60,-57,0,0,""],["神雀","cn","西漢",-60,-57,0,0,""],["五鳳","cn","西漢",-56,-53,0,0,""],["甘露","cn","西漢",-52,-49,0,0,""],["黃龍","cn","西漢",-48,-48,0,0,""],["初元","cn","西漢",-47,-43,0,0,""],["永光","cn","西漢",-42,-38,0,0,""],["建昭","cn","西漢",-37,-33,0,0,""],["竟寧","cn","西漢",-32,-32,0,0,""],["建始","cn","西漢",-31,-27,0,0,""],["河平","cn","西漢",-27,-24,0,0,""],["陽朔","cn","西漢",-23,-20,0,0,""],["鴻嘉","cn","西漢",-19,-16,0,0,""],["永始","cn","西漢",-15,-12,0,0,""],["元延","cn","西漢",-11,-8,0,0,""],["綏和","cn","西漢",-7,-6,0,0,""],["建平","cn","西漢",-5,-2,0,0,""],["元壽","cn","西漢",-1,0,0,0,""],["元始","cn","西漢",1,5,2,10,""],["居攝","cn","西漢",6,8,2,15,""],["初始","cn","西漢",8,8,12,15,""],["始建國","cn","新",9,13,1,13,""],["天鳳","cn","新",14,19,1,18,""],["地皇","cn","新",20,23,3,9,""],["更始","cn","更始",23,25,3,9,""],["建武","cn","東漢",25,56,8,3,""],["建武中元","cn","東漢",56,57,5,2,""],["中元","cn","東漢",56,57,5,2,""],["永平","cn","東漢",58,75,2,11,""],["建初","cn","東漢",76,84,2,22,""],["元和","cn","東漢",84,87,9,17,""],["章和","cn","東漢",87,88,9,10,""],["永元","cn","東漢",89,105,1,28,""],["元興","cn","東漢",105,105,6,16,""],["延平","cn","東漢",106,106,2,20,""],["永初","cn","東漢",107,113,2,9,""],["元初","cn","東漢",114,120,2,23,""],["永寧","cn","東漢",120,121,5,24,""],["建光","cn","東漢",121,122,7,31,""],["延光","cn","東漢",122,125,4,24,""],["永建","cn","東漢",126,132,2,9,""],["陽嘉","cn","東漢",132,135,4,15,""],["永和","cn","東漢",136,141,3,4,""],["漢安","cn","東漢",142,144,2,25,""],["建康","cn","東漢",144,144,5,19,""],["永嘉","cn","東漢",145,145,2,9,""],["本初","cn","東漢",146,146,1,29,""],["建和","cn","東漢",147,149,2,17,""],["和平","cn","東漢",150,150,2,14,""],["元嘉","cn","東漢",151,153,2,18,""],["永興","cn","東漢",153,154,6,30,""],["永壽","cn","東漢",155,158,3,4,""],["延熹","cn","東漢",158,167,7,16,""],["永康","cn","東漢",167,167,7,11,""],["建寧","cn","東漢",168,172,1,29,""],["熹平","cn","東漢",172,178,6,23,""],["光和","cn","東漢",178,184,4,5,""],["中平","cn","東漢",184,189,2,15,""],["光熹","cn","東漢",189,189,5,14,""],["昭寧","cn","東漢",189,189,8,28,""],["永漢","cn","東漢",189,189,9,27,""],["初平","cn","東漢",190,193,2,22,""],["興平","cn","東漢",194,195,2,20,""],["建安","cn","東漢",196,220,2,22,""],["延康","cn","東漢",220,220,4,21,""],["黃初","cn","三國魏",220,226,12,11,""],["太和","cn","三國魏",227,233,2,4,""],["青龍","cn","三國魏",233,237,3,4,""],["景初","cn","三國魏",237,239,4,12,""],["正始","cn","三國魏",240,249,2,10,""],["嘉平","cn","三國魏",249,254,4,30,""],["正元","cn","三國魏",254,256,4,5,""],["甘露","cn","三國魏",256,260,7,10,""],["景元","cn","三國魏",260,264,6,26,""],["咸熙","cn","三國魏",264,265,6,12,""],["章武","cn","三國蜀",221,223,5,15,""],["建興","cn","三國蜀",223,237,6,16,""],["延熙","cn","三國蜀",238,257,1,3,""],["景耀","cn","三國蜀",258,263,2,20,""],["炎興","cn","三國蜀",263,263,9,20,""],["黃武","cn","三國吳",222,229,11,22,""],["黃龍","cn","三國吳",229,231,5,11,""],["嘉禾","cn","三國吳",232,238,2,9,""],["赤烏","cn","三國吳",238,251,7,29,""],["太元","cn","三國吳",251,252,6,6,""],["神鳳","cn","三國吳",252,252,2,27,""],["建興","cn","三國吳",252,253,4,26,""],["五鳳","cn","三國吳",254,256,2,5,""],["太平","cn","三國吳",256,258,11,5,""],["永安","cn","三國吳",258,264,11,13,""],["元興","cn","三國吳",264,265,8,10,""],["甘露","cn","三國吳",265,266,5,3,""],["寶鼎","cn","三國吳",266,269,9,17,""],["建衡","cn","三國吳",269,272,11,11,""],["鳳凰","cn","三國吳",272,274,2,17,""],["鳳皇","cn","三國吳",272,274,2,16,""],["天冊","cn","三國吳",275,276,2,13,""],["天策","cn","三國吳",275,276,2,13,""],["天璽","cn","三國吳",276,276,7,28,""],["天紀","cn","三國吳",277,280,2,20,""],["泰始","cn","晉",265,274,2,4,""],["太始","cn","晉",265,274,2,8,""],["咸寧","cn","晉",275,280,2,13,""],["太康","cn","晉",280,289,6,13,""],["太熙","cn","晉",290,290,1,28,""],["永熙","cn","晉",290,290,5,16,""],["永平","cn","晉",291,299,4,24,""],["元康","cn","晉",291,299,4,16,""],["永康","cn","晉",300,301,2,7,""],["永寧","cn","晉",301,302,5,25,""],["太安","cn","晉",302,304,1,27,""],["永興","cn","晉",304,305,2,23,""],["永安","cn","晉",304,306,3,1,""],["光熙","cn","晉",306,306,6,29,""],["永嘉","cn","晉",307,313,2,21,""],["建興","cn","晉",313,317,6,8,""],["建武","cn","晉",317,318,3,30,""],["大興","cn","晉",318,321,4,27,""],["太興","cn","晉",318,321,4,27,""],["永昌","cn","晉",322,323,2,4,""],["太寧","cn","晉",323,326,4,23,""],["咸和","cn","晉",326,334,4,16,""],["咸康","cn","晉",335,342,2,11,""],["建元","cn","晉",343,344,2,12,""],["永和","cn","晉",345,356,2,22,""],["升平","cn","晉",357,361,2,6,""],["隆和","cn","晉",362,363,2,12,""],["興寧","cn","晉",363,365,3,3,""],["太和","cn","晉",366,371,1,29,""],["咸安","cn","晉",371,372,1,13,""],["寧康","cn","晉",373,375,2,10,""],["太元","cn","晉",376,396,2,10,""],["隆安","cn","晉",397,402,2,14,""],["元興","cn","晉",402,404,2,19,""],["義熙","cn","晉",405,418,3,3,""],["元熙","cn","晉",419,420,2,12,""],["建興","cn","北漢",304,308,11,15,""],["永鳳","cn","北漢",308,309,11,1,""],["河瑞","cn","北漢",309,310,6,25,""],["光興","cn","北漢",310,311,8,13,""],["嘉平","cn","北漢",311,315,7,4,""],["建元","cn","北漢",315,316,4,22,""],["麟嘉","cn","北漢",316,318,12,2,""],["漢昌","cn","北漢",318,318,8,14,""],["光初","cn","前趙",318,329,11,11,""],["建初","cn","成漢",303,304,2,4,""],["建興","cn","成漢",304,306,11,15,""],["晏平","cn","成漢",306,310,7,9,""],["玉衡","cn","成漢",311,338,2,6,""],["漢興","cn","成漢",338,343,5,7,""],["太和","cn","成漢",344,346,2,1,""],["嘉寧","cn","成漢",346,347,11,1,""],["太和","cn","後趙",328,330,2,28,""],["建平","cn","後趙",330,334,9,30,""],["建武","cn","後趙",335,348,2,11,""],["延熙","cn","後趙",334,334,12,13,""],["太寧","cn","後趙",349,349,2,5,""],["泰寧","cn","後趙",349,349,2,5,""],["青龍","cn","後趙",350,350,1,25,""],["永寧","cn","後趙",350,351,4,24,""],["建興","cn","前涼",313,361,1,30,""],["和平","cn","前涼",354,355,2,10,""],["升平","cn","前涼",357,371,1,13,""],["咸安","cn","前涼",371,376,2,22,""],["燕王","cn","前燕",337,348,2,18,""],["燕元","cn","前燕",349,352,2,5,""],["元璽","cn","前燕",352,357,12,23,""],["光壽","cn","前燕",357,359,3,8,""],["建熙","cn","前燕",360,370,2,4,""],["永興","cn","冉魏",350,352,3,25,""],["皇始","cn","前秦",351,355,2,13,""],["壽光","cn","前秦",355,357,6,27,""],["永興","cn","前秦",357,359,7,4,""],["甘露","cn","前秦",359,364,7,13,""],["建元","cn","前秦",365,385,2,8,""],["太安","cn","前秦",385,386,9,22,""],["太初","cn","前秦",386,394,12,9,""],["延初","cn","前秦",394,394,8,14,""],["燕元","cn","後燕",384,386,2,9,""],["建興","cn","後燕",386,396,3,18,""],["永康","cn","後燕",396,398,5,25,""],["建平","cn","後燕",398,398,10,28,""],["長樂","cn","後燕",399,401,2,23,""],["光始","cn","後燕",401,406,8,26,""],["建始","cn","後燕",407,407,1,26,""],["白雀","cn","後秦",384,386,5,8,""],["建初","cn","後秦",386,394,6,14,""],["皇初","cn","後秦",394,399,6,16,""],["弘始","cn","後秦",399,416,10,17,""],["永和","cn","後秦",416,417,3,16,""],["建義","cn","西秦",385,388,10,21,""],["太初","cn","西秦",388,400,7,21,""],["更始","cn","西秦",409,412,8,7,""],["永康","cn","西秦",412,419,9,23,""],["建弘","cn","西秦",420,428,2,1,""],["太安","cn","後涼",386,389,11,9,""],["麟嘉","cn","後涼",389,396,3,14,""],["龍飛","cn","後涼",396,398,7,23,""],["咸寧","cn","後涼",399,401,2,23,""],["神鼎","cn","後涼",401,403,3,2,""],["太初","cn","南涼",397,399,2,14,""],["建和","cn","南涼",400,402,2,12,""],["弘昌","cn","南涼",402,404,4,19,""],["嘉平","cn","南涼",408,414,12,5,""],["神璽","cn","北涼",397,398,6,13,""],["天璽","cn","北涼",399,401,3,24,""],["永安","cn","北涼",401,412,6,28,""],["玄始","cn","北涼",412,428,12,20,""],["承玄","cn","北涼",428,431,2,3,""],["義和","cn","北涼",431,432,6,24,""],["承和","cn","北涼",433,437,5,6,""],["燕平","cn","南燕",398,400,2,4,""],["建平","cn","南燕",400,405,9,6,""],["太上","cn","南燕",405,410,12,8,""],["庚子","cn","西涼",400,404,12,3,""],["建初","cn","西涼",405,417,2,16,""],["嘉興","cn","西涼",417,419,3,5,""],["永建","cn","西涼",420,421,11,22,""],["龍昇","cn","夏",407,413,7,22,""],["鳳翔","cn","夏",413,418,4,17,""],["昌武","cn","夏",418,419,12,15,""],["真興","cn","夏",419,425,3,13,""],["承光","cn","夏",425,428,8,31,""],["勝光","cn","夏",428,431,3,3,""],["正始","cn","北燕",407,409,8,20,""],["太平","cn","北燕",409,430,10,26,""],["大興","cn","北燕",431,436,1,30,""],["燕興","cn","西燕",384,384,5,8,""],["更始","cn","西燕",385,386,1,28,""],["昌平","cn","西燕",386,386,3,18,""],["建明","cn","西燕",386,386,4,16,""],["建平","cn","西燕",386,386,4,16,""],["建武","cn","西燕",386,386,4,16,""],["中興","cn","西燕",386,394,11,9,""],["永初","cn","劉宋",420,422,7,11,""],["景平","cn","劉宋",423,424,1,29,""],["元嘉","cn","劉宋",424,453,1,25,""],["孝建","cn","劉宋",454,456,2,15,""],["大明","cn","劉宋",457,464,2,11,""],["永光","cn","劉宋",465,465,2,13,""],["景和","cn","劉宋",465,465,9,7,""],["泰始","cn","劉宋",465,471,1,10,""],["泰豫","cn","劉宋",472,472,1,27,""],["元徽","cn","劉宋",473,477,2,14,""],["昇明","cn","劉宋",477,479,8,6,""],["建元","cn","南齊",479,482,6,1,""],["永明","cn","南齊",483,493,4,12,""],["隆昌","cn","南齊",494,494,1,24,""],["延興","cn","南齊",494,494,9,11,""],["建武","cn","南齊",494,498,12,23,""],["永泰","cn","南齊",498,498,5,10,""],["永元","cn","南齊",499,501,1,29,""],["中興","cn","南齊",501,502,4,16,""],["天監","cn","南梁",502,519,5,2,""],["普通","cn","南梁",520,527,2,6,""],["大通","cn","南梁",527,529,4,19,""],["中大通","cn","南梁",529,534,1,18,""],["大同","cn","南梁",535,546,2,20,""],["中大同","cn","南梁",546,547,5,31,""],["太清","cn","南梁",547,552,5,27,""],["大寶","cn","南梁",550,552,2,4,""],["天正","cn","南梁",552,552,5,24,""],["承聖","cn","南梁",552,555,12,15,""],["天成","cn","南梁",555,555,7,3,""],["紹泰","cn","南梁",555,556,11,23,""],["太平","cn","南梁",556,557,10,21,""],["大定","cn","西梁",555,562,2,9,""],["天保","cn","西梁",562,585,2,21,""],["廣運","cn","西梁",586,587,1,27,""],["永定","cn","陳",557,559,11,14,""],["天嘉","cn","陳",560,566,2,14,""],["天康","cn","陳",566,566,4,6,""],["光大","cn","陳",567,568,1,28,""],["太建","cn","陳",569,582,2,7,""],["至德","cn","陳",583,587,2,2,""],["禎明","cn","陳",587,589,2,15,""],["登國","cn","北魏",386,395,2,21,""],["皇始","cn","北魏",396,398,8,21,""],["天興","cn","北魏",398,404,1,25,""],["天賜","cn","北魏",404,409,12,16,""],["永興","cn","北魏",409,413,11,24,""],["神瑞","cn","北魏",414,416,2,7,""],["泰常","cn","北魏",416,423,5,18,""],["始光","cn","北魏",424,428,12,28,""],["神麚","cn","北魏",428,431,3,3,""],["神䴥","cn","北魏",428,431,3,3,""],["延和","cn","北魏",432,434,2,18,""],["太延","cn","北魏",435,439,3,12,""],["太平真君","cn","北魏",440,451,7,21,""],["真君","cn","北魏",440,451,7,21,""],["正平","cn","北魏",451,452,7,16,""],["承平","cn","北魏",452,452,11,1,""],["興安","cn","北魏",452,454,10,30,""],["興光","cn","北魏",454,454,8,16,""],["太安","cn","北魏",455,459,7,3,""],["和平","cn","北魏",460,465,2,9,""],["天安","cn","北魏",466,467,2,2,""],["皇興","cn","北魏",467,471,10,14,""],["延興","cn","北魏",471,476,9,21,""],["承明","cn","北魏",476,476,7,22,""],["太和","cn","北魏",477,499,1,31,""],["景明","cn","北魏",500,503,2,20,""],["正始","cn","北魏",504,508,2,21,""],["永平","cn","北魏",508,512,9,28,""],["延昌","cn","北魏",512,515,5,28,""],["熙平","cn","北魏",516,518,2,20,""],["神龜","cn","北魏",518,520,3,22,""],["正光","cn","北魏",520,525,8,20,""],["孝昌","cn","北魏",525,527,7,17,""],["武泰","cn","北魏",528,528,2,15,""],["建義","cn","北魏",528,528,5,20,""],["永安","cn","北魏",528,530,10,21,""],["建明","cn","北魏",530,531,11,8,""],["普泰","cn","北魏",531,532,4,3,""],["中興","cn","北魏",531,532,10,28,""],["太昌","cn","北魏",532,532,6,15,""],["永興","cn","北魏",532,532,1,13,""],["永熙","cn","北魏",532,534,1,13,""],["天平","cn","東魏",534,537,11,10,""],["元象","cn","東魏",538,539,2,23,""],["興和","cn","東魏",539,542,11,28,""],["武定","cn","東魏",543,550,1,23,""],["大統","cn","西魏",535,551,2,20,""],["天保","cn","北齊",550,559,6,11,""],["乾明","cn","北齊",560,560,2,14,""],["皇建","cn","北齊",560,561,9,10,""],["太寧","cn","北齊",561,562,12,5,""],["大寧","cn","北齊",561,562,12,5,""],["河清","cn","北齊",562,565,5,26,""],["天統","cn","北齊",565,569,6,10,""],["武平","cn","北齊",570,576,1,24,""],["隆化","cn","北齊",576,577,1,19,""],["德昌","cn","北齊",576,576,1,20,""],["承光","cn","北齊",577,577,2,7,""],["武成","cn","北周",559,560,10,2,""],["保定","cn","北周",561,565,2,3,""],["天和","cn","北周",566,572,2,12,""],["建德","cn","北周",572,578,5,1,""],["宣政","cn","北周",578,578,3,26,""],["大成","cn","北周",579,579,2,14,""],["大象","cn","北周",579,581,2,14,""],["大定","cn","北周",581,581,1,23,""],["開皇","cn","隋",581,600,3,6,""],["仁壽","cn","隋",601,604,2,11,""],["大業","cn","隋",605,617,1,28,""],["義寧","cn","隋",617,618,12,21,""],["皇泰","cn","隋",618,619,6,25,""],["武德","cn","唐",618,626,5,26,""],["貞觀","cn","唐",627,649,1,26,""],["永徽","cn","唐",650,656,2,10,""],["顯慶","cn","唐",656,661,2,10,""],["龍朔","cn","唐",661,663,4,8,""],["麟德","cn","唐",664,666,1,7,""],["乾封","cn","唐",666,668,2,13,""],["總章","cn","唐",668,670,4,1,""],["咸亨","cn","唐",670,674,3,30,""],["上元","cn","唐",674,676,9,23,""],["儀鳳","cn","唐",676,679,12,21,""],["調露","cn","唐",679,680,7,18,""],["永隆","cn","唐",680,681,9,24,""],["開耀","cn","唐",681,682,11,18,""],["永淳","cn","唐",682,683,4,15,""],["弘道","cn","唐",683,683,12,30,""],["嗣聖","cn","唐",684,684,1,26,""],["文明","cn","唐",684,684,3,1,""],["光宅","cn","唐",684,684,10,21,""],["垂拱","cn","唐",685,688,2,12,""],["永昌","cn","唐",689,689,1,30,""],["神龍","cn","周",705,711,2,3,""],["天授","cn","周",690,692,10,19,""],["如意","cn","周",692,692,4,25,""],["長壽","cn","周",692,694,10,26,""],["延載","cn","周",694,695,6,12,""],["證聖","cn","周",695,695,11,26,""],["天冊萬歲","cn","周",695,696,10,25,""],["萬歲登封","cn","周",696,696,1,23,""],["萬歲通天","cn","周",696,697,4,25,""],["神功","cn","周",697,697,10,2,""],["聖曆","cn","周",698,700,12,23,""],["久視","cn","周",700,701,5,31,""],["大足","cn","周",701,701,2,19,""],["長安","cn","周",701,704,11,30,""],["載初","cn","唐",690,690,12,21,""],["景龍","cn","唐",707,710,10,9,""],["唐隆","cn","唐",710,710,7,9,""],["景雲","cn","唐",710,711,8,23,""],["太極","cn","唐",712,712,3,5,""],["延和","cn","唐",712,712,6,15,""],["先天","cn","唐",712,713,9,16,""],["開元","cn","唐",713,741,12,26,""],["天寶","cn","唐",742,756,2,14,""],["至德","cn","唐",756,758,8,16,""],["乾元","cn","唐",758,760,3,22,""],["上元","cn","唐",760,762,6,11,""],["寶應","cn","唐",762,763,3,20,""],["廣德","cn","唐",763,764,8,28,""],["永泰","cn","唐",765,766,1,30,""],["大曆","cn","唐",766,779,12,22,""],["建中","cn","唐",780,783,2,15,""],["興元","cn","唐",784,784,1,31,""],["貞元","cn","唐",785,805,2,18,""],["永貞","cn","唐",805,806,9,5,""],["元和","cn","唐",806,821,1,29,""],["長慶","cn","唐",821,825,2,12,""],["寶曆","cn","唐",825,827,2,2,""],["大和","cn","唐",827,835,3,18,""],["開成","cn","唐",836,841,1,26,""],["會昌","cn","唐",841,847,2,8,""],["大中","cn","唐",847,860,2,10,""],["咸通","cn","唐",860,874,12,21,""],["乾符","cn","唐",874,879,12,21,""],["廣明","cn","唐",880,881,2,18,""],["中和","cn","唐",881,885,8,13,""],["光啟","cn","唐",885,888,4,6,""],["文德","cn","唐",888,888,4,11,""],["龍紀","cn","唐",889,889,2,8,""],["大順","cn","唐",890,892,1,29,""],["景福","cn","唐",892,893,2,26,""],["乾寧","cn","唐",894,898,2,14,""],["光化","cn","唐",898,901,9,20,""],["天復","cn","唐",901,904,5,21,""],["天祐","cn","唐",904,907,6,2,""],["太和","cn","吳",929,935,1,4,""],["天祚","cn","吳",935,937,10,9,""],["武成","cn","前蜀",908,910,2,19,""],["永平","cn","前蜀",911,915,2,7,""],["通正","cn","前蜀",916,916,2,11,""],["天漢","cn","前蜀",917,917,1,31,""],["光大","cn","前蜀",918,918,2,19,""],["光天","cn","前蜀",918,918,2,19,""],["廣大","cn","前蜀",918,918,2,19,""],["天祐","cn","吳",904,919,6,7,""],["乾德","cn","前蜀",919,924,2,9,""],["咸康","cn","前蜀",925,925,2,1,""],["明德","cn","後蜀",934,937,6,1,""],["廣政","cn","後蜀",938,965,2,7,""],["天祐","cn","吳越",904,907,6,19,""],["鳳曆","cn","吳越",908,913,2,10,""],["乾化","cn","吳越",911,915,3,6,""],["貞明","cn","吳越",915,921,12,22,""],["龍德","cn","吳越",921,923,6,14,""],["寶大","cn","吳越",924,925,2,13,""],["長興","cn","閩",930,932,3,28,""],["永和","cn","閩",935,936,2,11,""],["長興","cn","後蜀",930,934,2,22,""],["同光","cn","南平",923,926,4,12,""],["天德","cn","閩",943,945,3,14,""],["乾亨","cn","南漢",917,925,9,10,""],["白龍","cn","南漢",925,928,12,24,""],["大有","cn","南漢",928,942,3,30,""],["光天","cn","南漢",942,943,4,16,""],["應乾","cn","南漢",943,943,4,20,""],["乾和","cn","南漢",943,958,12,17,""],["大寶","cn","南漢",958,971,9,23,""],["顯德","cn","南唐",954,960,5,26,""],["建隆","cn","南唐",960,963,2,9,""],["中興","cn","南唐",958,958,1,28,""],["交泰","cn","南唐",958,958,4,2,""],["天成","cn","南平",926,930,5,20,""],["乾貞","cn","南平",927,927,12,4,""],["天祐","cn","遼",904,916,3,4,""],["天贊","cn","遼",922,926,3,28,""],["天顯","cn","遼",926,938,3,26,""],["會同","cn","遼",938,947,12,22,""],["大同","cn","遼",947,947,3,1,""],["天祿","cn","遼",947,951,11,6,""],["應曆","cn","遼",951,969,10,12,""],["保寧","cn","遼",969,979,3,17,""],["乾亨","cn","遼",979,983,12,22,""],["統和","cn","遼",983,1012,7,27,""],["開泰","cn","遼",1012,1021,12,22,""],["太平","cn","遼",1021,1031,12,24,""],["景福","cn","遼",1031,1032,7,1,""],["重熙","cn","遼",1032,1055,12,22,""],["清寧","cn","遼",1055,1064,9,3,""],["咸雍","cn","遼",1065,1074,2,14,""],["太康","cn","遼",1075,1084,1,26,""],["大安","cn","遼",1085,1094,2,4,""],["壽昌","cn","遼",1095,1101,2,14,""],["乾統","cn","遼",1101,1110,2,19,""],["天慶","cn","遼",1111,1120,2,17,""],["保大","cn","遼",1121,1125,1,28,""],["建隆","cn","宋",960,963,2,9,""],["乾德","cn","宋",963,968,12,9,""],["開寶","cn","宋",968,976,12,21,""],["太平興國","cn","宋",976,984,1,19,""],["雍熙","cn","宋",984,987,12,21,""],["端拱","cn","宋",988,989,3,5,""],["淳化","cn","宋",990,994,2,4,""],["至道","cn","宋",995,997,2,8,""],["咸平","cn","宋",998,1003,2,5,""],["景德","cn","宋",1004,1008,1,31,""],["大中祥符","cn","宋",1008,1016,2,21,""],["天禧","cn","宋",1017,1021,2,6,""],["乾興","cn","宋",1022,1022,2,10,""],["天聖","cn","宋",1023,1032,1,31,""],["明道","cn","宋",1032,1033,12,17,""],["景祐","cn","宋",1034,1038,1,29,""],["寶元","cn","宋",1038,1040,12,22,""],["康定","cn","宋",1040,1041,4,11,""],["慶曆","cn","宋",1041,1048,12,22,""],["皇祐","cn","宋",1049,1054,2,11,""],["至和","cn","宋",1054,1056,5,16,""],["嘉祐","cn","宋",1056,1063,10,29,""],["治平","cn","宋",1064,1067,1,27,""],["熙寧","cn","宋",1068,1077,2,12,""],["元豐","cn","宋",1078,1085,1,23,""],["元祐","cn","宋",1086,1094,1,24,""],["紹聖","cn","宋",1094,1098,5,5,""],["元符","cn","宋",1098,1100,7,8,""],["建中靖國","cn","宋",1101,1101,2,7,""],["崇寧","cn","宋",1102,1106,1,28,""],["大觀","cn","宋",1107,1110,2,2,""],["政和","cn","宋",1111,1118,2,17,""],["重和","cn","宋",1118,1119,12,22,""],["宣和","cn","宋",1119,1125,3,20,""],["靖康","cn","宋",1126,1127,2,1,""],["建炎","cn","宋",1127,1130,6,19,""],["紹興","cn","宋",1131,1162,2,7,""],["隆興","cn","宋",1163,1164,2,12,""],["乾道","cn","宋",1165,1173,2,20,""],["淳熙","cn","宋",1174,1189,2,11,""],["紹熙","cn","宋",1190,1194,2,14,""],["慶元","cn","宋",1195,1200,2,19,""],["嘉泰","cn","宋",1201,1204,2,12,""],["開禧","cn","宋",1205,1207,1,29,""],["嘉定","cn","宋",1208,1224,1,26,""],["寶慶","cn","宋",1225,1227,2,16,""],["紹定","cn","宋",1228,1233,2,15,""],["端平","cn","宋",1234,1236,2,7,""],["嘉熙","cn","宋",1237,1240,2,4,""],["淳祐","cn","宋",1241,1252,2,20,""],["寶祐","cn","宋",1253,1258,2,7,""],["開慶","cn","宋",1259,1259,2,1,""],["景定","cn","宋",1260,1264,2,20,""],["咸淳","cn","宋",1265,1274,1,26,""],["德祐","cn","宋",1275,1276,2,5,""],["景炎","cn","宋",1276,1278,6,21,""],["祥興","cn","宋",1278,1279,5,30,""],["顯道","cn","西夏",1032,1034,12,15,""],["開運","cn","西夏",1034,1034,8,23,""],["廣運","cn","西夏",1034,1036,9,22,""],["大慶","cn","西夏",1036,1038,12,27,""],["天授禮法延祚","cn","西夏",1038,1048,11,16,""],["延嗣寧國","cn","西夏",1049,1049,2,11,""],["天祐垂聖","cn","西夏",1050,1052,2,1,""],["福聖承道","cn","西夏",1053,1056,1,29,""],["奲都","cn","西夏",1057,1062,2,13,""],["拱化","cn","西夏",1063,1067,2,7,""],["乾道","cn","西夏",1068,1068,2,12,""],["天賜禮盛國慶","cn","西夏",1069,1073,2,1,""],["大安","cn","西夏",1074,1084,2,5,""],["天安禮定","cn","西夏",1085,1086,2,4,""],["天儀治平","cn","西夏",1087,1089,2,12,""],["天祐民安","cn","西夏",1090,1097,2,9,""],["永安","cn","西夏",1098,1100,2,10,""],["貞觀","cn","西夏",1101,1113,2,7,""],["雍寧","cn","西夏",1114,1118,2,15,""],["元德","cn","西夏",1119,1127,2,19,""],["正德","cn","西夏",1127,1134,5,20,""],["大德","cn","西夏",1135,1139,1,23,""],["大慶","cn","西夏",1140,1143,1,29,""],["人慶","cn","西夏",1144,1148,2,13,""],["天盛","cn","西夏",1149,1169,2,17,""],["乾祐","cn","西夏",1170,1193,1,26,""],["天慶","cn","西夏",1194,1206,1,31,""],["應天","cn","西夏",1206,1209,3,8,""],["皇建","cn","西夏",1210,1211,2,3,""],["光定","cn","西夏",1211,1223,8,19,""],["乾定","cn","西夏",1223,1226,10,3,""],["寶義","cn","西夏",1226,1227,8,2,""],["收國","cn","金",1115,1116,2,4,""],["天輔","cn","金",1117,1123,2,11,""],["天會","cn","金",1123,1137,9,26,""],["天眷","cn","金",1138,1141,2,19,""],["皇統","cn","金",1141,1149,2,28,""],["天德","cn","金",1149,1153,1,18,""],["貞元","cn","金",1153,1156,4,28,""],["正隆","cn","金",1156,1161,3,1,""],["大定","cn","金",1161,1189,11,4,""],["明昌","cn","金",1190,1196,2,14,""],["承安","cn","金",1196,1201,12,21,""],["泰和","cn","金",1201,1208,2,12,""],["大安","cn","金",1209,1211,3,11,""],["崇慶","cn","金",1212,1213,2,12,""],["至寧","cn","金",1213,1213,5,29,""],["貞祐","cn","金",1213,1217,10,7,""],["興定","cn","金",1217,1222,10,16,""],["元光","cn","金",1222,1223,9,22,""],["正大","cn","金",1224,1232,1,29,""],["開興","cn","金",1232,1232,2,18,""],["天興","cn","金",1232,1234,5,12,""],["延慶","cn","西遼",1124,1133,2,24,""],["康國","cn","西遼",1134,1143,2,3,""],["咸清","cn","西遼",1144,1150,2,13,""],["續興","cn","西遼",1151,1163,1,27,""],["崇福","cn","西遼",1164,1177,2,2,""],["天禧","cn","西遼",1178,1211,1,28,""],["中統","cn","元",1260,1264,7,6,""],["至元","cn","元",1264,1294,9,14,""],["元貞","cn","元",1295,1297,1,24,""],["大德","cn","元",1297,1307,3,2,""],["至大","cn","元",1308,1311,2,1,""],["皇慶","cn","元",1312,1314,2,16,""],["延祐","cn","元",1314,1320,2,15,""],["至治","cn","元",1321,1223,2,6,""],["泰定","cn","元",1324,1328,2,4,""],["致和","cn","元",1328,1328,4,15,""],["天曆","cn","元",1328,1328,10,24,""],["至順","cn","元",1330,1333,6,2,""],["元統","cn","元",1333,1335,11,23,""],["至元","cn","元",1335,1340,12,16,""],["至正","cn","元",1341,1370,1,26,""],["宣光","cn","北元",1370,1378,6,4,""],["天光","cn","北元",1379,1388,1,27,""],["洪武","cn","明",1368,1402,1,28,""],["建文","cn","明",1399,1402,2,14,""],["永樂","cn","明",1403,1424,2,1,""],["洪熙","cn","明",1425,1425,1,29,""],["宣德","cn","明",1426,1435,2,17,""],["正統","cn","明",1436,1449,1,27,""],["景泰","cn","明",1450,1457,1,23,""],["天順","cn","明",1457,1464,2,24,""],["成化","cn","明",1465,1487,2,5,""],["弘治","cn","明",1488,1505,1,23,""],["正德","cn","明",1506,1521,2,3,""],["嘉靖","cn","明",1522,1566,2,7,""],["隆慶","cn","明",1567,1572,2,19,""],["萬曆","cn","明",1573,1620,2,12,""],["泰昌","cn","明",1620,1620,1,22,""],["天啟","cn","明",1621,1627,1,22,""],["崇禎","cn","明",1628,1644,2,5,""],["天命","cn","清",1616,1626,2,17,""],["天聰","cn","清",1627,1636,2,16,""],["崇德","cn","清",1636,1643,5,15,""],["順治","cn","清",1644,1661,2,8,""],["康熙","cn","清",1662,1722,2,18,""],["雍正","cn","清",1723,1735,2,5,""],["乾隆","cn","清",1736,1796,2,12,""],["嘉慶","cn","清",1796,1820,2,9,""],["道光","cn","清",1821,1850,2,3,""],["咸豐","cn","清",1851,1861,2,1,""],["同治","cn","清",1862,1875,1,30,""],["光緒","cn","清",1875,1908,2,6,""],["宣統","cn","清",1909,1912,1,22,""],["弘光","cn","南明",1645,1645,1,28,""],["隆武","cn","南明",1645,1646,8,21,""],["乾貞","cn","南平",928,929,1,31,""],["永曆","cn","南明",1647,1662,2,5,""],["天順","cn","元",1328,1328,10,12,""],["長興","cn","南平",930,934,3,28,""],["應順","cn","南平",934,934,1,29,""],["清泰","cn","南平",934,936,6,5,""],["天福","cn","南平",936,948,11,22,""],["開運","cn","南平",944,946,7,28,""],["開明","cn","鄭（王世充）",619,621,5,22,""],["前元","cn","西漢",-179,-163,0,0,""],["前元","cn","西漢",-156,-149,0,0,""],["乾化","cn","後梁",911,915,4,1,""],["天復","cn","前蜀",901,908,11,8,""],["寶太","cn","吳越",924,925,2,13,""],["寶正","cn","吳越",926,932,2,20,""],["寶貞","cn","吳越",926,932,2,20,""],["開平","cn","後梁",907,911,6,6,""],["鳳曆","cn","後梁",913,913,3,6,""],["天成","cn","楚(馬)",926,930,7,7,""],["長興","cn","楚(馬)",930,934,11,28,""],["乾祐","cn","南平",948,951,2,22,""],["廣順","cn","南平",951,953,2,18,""],["同光","cn","後唐",923,926,5,18,""],["天成","cn","後唐",926,930,6,16,""],["應順","cn","後唐",934,934,1,29,""],["清泰","cn","後唐",934,936,5,24,""],["顯德","cn","南平",954,960,2,11,""],["建隆","cn","南平",960,962,2,9,""],["建隆","cn","南平",962,963,12,5,""],["應順","cn","楚(馬)",934,934,1,29,""],["清泰","cn","楚(馬)",934,936,6,5,""],["開平","cn","閩",907,911,4,28,""],["天成","cn","閩",926,930,1,19,""],["龍啟","cn","閩",933,935,2,3,""],["通文","cn","閩",936,939,3,31,""],["永隆","cn","閩",939,943,9,4,""],["昇元","cn","南唐",937,943,11,15,""],["保大","cn","南唐",943,957,4,13,""],["神冊","cn","遼",916,920,3,22,""],["天福","cn","楚(馬)",936,948,1,4,""],["開運","cn","楚(馬)",944,947,7,28,""],["乾德","cn","南唐",963,968,12,9,""],["開寶","cn","南唐",968,974,12,21,""],["乾祐","cn","楚(馬)",948,950,2,22,""],["保大","cn","楚(馬)",950,951,1,29,""],["保貞","cn","吳越",926,932,2,20,""],["天福","cn","後漢",936,947,3,1,""],["乾祐","cn","後漢",948,951,2,18,""],["廣順","cn","後周",951,953,2,18,""],["顯德","cn","後周",954,960,2,11,""],["乾祐","cn","北漢",948,956,3,1,""],["天會","cn","北漢",957,973,2,8,""],["廣運","cn","北漢",974,979,1,31,""],["長興","cn","吳越",932,934,5,14,""],["貞明","cn","後梁",915,921,12,22,""],["嘉祐","cn","宋",1054,1067,5,7,""],["龍德","cn","後梁",921,923,6,14,""],["應順","cn","吳越",934,934,1,29,""],["清泰","cn","吳越",934,936,6,5,""],["長興","cn","後唐",930,934,3,28,""],["天福","cn","吳越",936,947,1,4,""],["明受","cn","宋",1129,1164,4,8,""],["天福","cn","吳越",941,944,9,29,""],["乾化","cn","閩",911,915,6,5,""],["貞明","cn","閩",915,921,12,22,""],["龍德","cn","閩",921,923,6,14,""],["開運","cn","吳越",944,946,7,28,""],["會同","cn","吳越",938,947,1,30,""],["乾祐","cn","吳越",948,951,2,18,""],["同光","cn","閩",923,926,5,18,""],["武義","cn","吳",919,921,5,8,""],["順義","cn","吳",921,927,3,18,""],["乾貞","cn","吳",927,929,12,4,""],["乾正","cn","吳",927,929,12,4,""],["廣順","cn","吳越",951,953,2,18,""],["顯德","cn","吳越",954,960,2,11,""],["建隆","cn","吳越",960,963,2,9,""],["乾德","cn","吳越",963,968,12,9,""],["開寶","cn","吳越",968,976,12,21,""],["太平興國","cn","吳越",976,978,1,19,""],["太初","cn","劉宋",453,453,3,17,""],["建平","cn","北魏",415,415,3,27,""],["太始","cn","侯漢",551,552,1,3,""],["永始","cn","桓楚",403,404,12,31,""],["民國","cn","中華民國",1912,2999,1,1,""],["永樂","kr","高句麗",391,412,0,0,""],["延壽","kr","高句麗",451,451,0,0,""],["建元","kr","新羅",536,550,0,0,""],["開國","kr","新羅",551,567,0,0,""],["大昌","kr","新羅",568,571,0,0,""],["鴻濟","kr","新羅",572,583,0,0,""],["建福","kr","新羅",584,633,0,0,""],["仁平","kr","新羅",634,647,0,0,""],["太和","kr","新羅",647,650,0,0,""],["慶雲","kr","新羅（金憲昌）",822,822,0,0,""],["仁安","kr","渤海",720,737,0,0,""],["大興","kr","渤海",738,794,0,0,""],["寶曆","kr","渤海",774,785,0,0,""],["中興","kr","渤海",794,794,0,0,""],["正曆","kr","渤海",795,809,0,0,""],["永德","kr","渤海",810,812,0,0,""],["朱雀","kr","渤海",813,817,0,0,""],["太始","kr","渤海",818,818,0,0,""],["建興","kr","渤海",819,830,0,0,""],["咸和","kr","渤海",831,857,0,0,""],["正開","kr","後百濟",900,936,0,0,""],["武泰","kr","泰封",904,905,0,0,""],["聖冊","kr","泰封",905,911,0,0,""],["水德萬歲","kr","泰封",911,914,0,0,""],["政開","kr","泰封",914,918,0,0,""],["天授","kr","高麗",918,933,0,0,""],["光德","kr","高麗",949,952,0,0,""],["峻豊","kr","高麗",960,963,0,0,""],["天開","kr","高麗（妙清）",1135,1135,0,0,""],["開國","kr","朝鮮",1894,1895,0,0,""],["建陽","kr","朝鮮",1896,1897,0,0,""],["光武","kr","大韓帝国",1897,1907,0,0,""],["隆熙","kr","大韓帝国",1907,1910,0,0,""]];
+const ERAS=ERA_RAW.map((r,i)=>({n:r[0],c:r[1],dy:r[2],s:r[3],e:r[4],md:r[5]?[r[5],r[6]]:null,t:r[7]}));
+[['明治',1868,1912,[1,1],'M'],['大正',1912,1926,[7,30],'T'],['昭和',1926,1989,[12,25],'S'],['平成',1989,2019,[1,8],'H'],['令和',2019,9999,[5,1],'R']]
+  .forEach(([n,s,e,md,sh])=>ERAS.push({n,c:'jp',dy:'日本',s,e,md,t:'',short:sh}));
+ERAS.forEach(e=>{e.id=`${e.c}|${e.dy}|${e.n}|${e.s}`;if(e.c==='jp'&&e.n==='元徳')e.t='';if(e.c==='jp'&&e.n==='建武')e.e=1338;});
+const ERA_BY_ID=new Map(ERAS.map(e=>[e.id,e]));
+const JP_BY_NAME=new Map();ERAS.filter(e=>e.c==='jp').forEach(e=>{if(!JP_BY_NAME.has(e.n))JP_BY_NAME.set(e.n,e);});
+const DYN_SPAN={};ERAS.forEach(e=>{const d=DYN_SPAN[e.dy]||(DYN_SPAN[e.dy]={s:e.s,e:e.e,c:e.c});d.s=Math.min(d.s,e.s);d.e=Math.max(d.e,Math.min(e.e,2100));});
+const CN_DYNS=Object.keys(DYN_SPAN).filter(k=>DYN_SPAN[k].c==='cn').sort((a,b)=>DYN_SPAN[a].s-DYN_SPAN[b].s);
+const GREG_Y={jp:1873,cn:1912,kr:1896};
+const KYU='應観寶德曆龜壽萬靈齊國寬圓禮祿龍鎭顯攝經乘歷靜覺與惠榮樂廣傳來禪實曉滿淨錄豐興會應義萬';
+const SHIN='応観宝徳暦亀寿万霊斉国寛円礼禄竜鎮顕摂経乗暦静覚与恵栄楽広伝来禅実暁満浄録豊興会応義万';
+const normJ=s=>[...String(s)].map(c=>{const i=KYU.indexOf(c);return i>=0?SHIN[i]:c;}).join('');
+const calOf=p=>(p&&p.cal)||'jp';
+const calCountry=cal=>String(cal).startsWith('cn')?'cn':cal==='kr'?'kr':'jp';
+function erasInYear(y,c){return ERAS.filter(e=>(!c||e.c===c)&&e.s<=y&&e.e>=y);}
+function pickMajority(list,y){
+  if(list.length<=1)return list[0]||null;
+  list=list.slice().sort((a,b)=>a.s-b.s);
+  const nw=list[list.length-1];
+  if(nw.s===y&&nw.md){const doy=(Date.UTC(2001,nw.md[0]-1,nw.md[1])-Date.UTC(2001,0,1))/864e5;if(doy>182){const old=list.filter(e=>e.s<y);if(old.length)return old[old.length-1];}}
+  return nw;
+}
+function eraForYear(y,cal){
+  cal=cal||'jp';const c=calCountry(cal);
+  if(c==='jp'){let l=erasInYear(y,'jp').filter(e=>cal==='jpN'?e.t!=='南朝':e.t!=='北朝');return pickMajority(l,y);}
+  if(c==='kr'){const l=erasInYear(y,'kr');if(l.length)return pickMajority(l,y);return eraForYear(y,'cn');}
+  let l=erasInYear(y,'cn');if(!l.length)return null;
+  const dyn=String(cal).split(':')[1];
+  if(dyn){const m=l.filter(e=>e.dy===dyn);if(m.length)return pickMajority(m,y);}
+  const span=d=>DYN_SPAN[d].e-DYN_SPAN[d].s;
+  const best=l.map(e=>e.dy).sort((a,b)=>span(b)-span(a))[0];
+  return pickMajority(l.filter(e=>e.dy===best),y);
+}
+function eraForDate(y,m,d,cal){
+  if(calCountry(cal)!=='jp'||y<1873||!m)return eraForYear(y,cal);
+  const list=erasInYear(y,'jp');let cur=list[0];
+  list.forEach(e=>{if(e.s===y&&e.md&&(m>e.md[0]||(m===e.md[0]&&(d||1)>=e.md[1])))cur=e;});
+  if(list.length>1&&!d&&m===list[list.length-1].md[0])return eraForYear(y,cal);
+  return cur;
+}
+function eraLabel(e,o){
+  o=o||{};
+  if(e.c==='jp')return settings.eraShort&&e.short?e.short:e.n;
+  if(o.noDyn||e.n==='民國')return e.n;
+  return e.dy.replace(/（.*）/,'')+(o.vert?'':' ')+e.n;
+}
+const STEM='甲乙丙丁戊己庚辛壬癸',BRANCH='子丑寅卯辰巳午未申酉戌亥';
+const STEMY=['きのえ','きのと','ひのえ','ひのと','つちのえ','つちのと','かのえ','かのと','みずのえ','みずのと'];
+const BRANCHY=['ね','うし','とら','う','たつ','み','うま','ひつじ','さる','とり','いぬ','い'];
+const etoIdx=y=>((y-4)%60+60)%60;
+const eto=y=>STEM[etoIdx(y)%10]+BRANCH[etoIdx(y)%12];
+const etoYomi=y=>STEMY[etoIdx(y)%10]+BRANCHY[etoIdx(y)%12];
+const westYear=y=>y<=0?'紀元前'+(1-y):String(y);
+// 日付 {src:'w'|'j', eid, y, m, d} / {raw}
+function dateInfo(dt,cal){
+  if(!dt||dt.raw||!dt.y)return null;
+  let wy,era,ey;
+  if(dt.src==='j'){era=ERA_BY_ID.get(dt.eid)||(dt.era&&JP_BY_NAME.get(dt.era));if(!era)return null;ey=dt.y;wy=era.s+ey-1;}
+  else{wy=dt.y;era=eraForDate(wy,dt.m,dt.d,cal);ey=era?wy-era.s+1:null;}
+  const gc=era?era.c:calCountry(cal);
+  const old=wy<GREG_Y[gc];
+  return{wy,era,ey,m:dt.m||null,d:dt.d||null,approxW:old&&dt.src==='j'&&!!dt.m,approxJ:old&&dt.src!=='j'&&!!dt.m};
+}
+const DFMTS=[
+  {k:'w',label:'西暦だけ'},{k:'j',label:'元号だけ'},
+  {k:'wj',label:'西暦（元号）年'},{k:'jw',label:'元号（西暦）年'},
+  {k:'w_j',label:'西暦年（元号年）'},{k:'j_w',label:'元号年（西暦年）'}];
+function fmtDate(dt,o){
+  o=o||{};
+  if(dt&&dt.raw)return o.vert?kanText(dt.raw):dt.raw;
+  const I=dateInfo(dt,o.cal);if(!I)return '';
+  const f=o.fmt||settings.datefmt||'w';
+  const W=westYear(I.wy),aw=I.approxW?'頃':'',aj=I.approxJ?'頃':'';
+  const J=I.era&&I.ey>0?eraLabel(I.era,{vert:o.vert})+(I.ey===1?'元':String(I.ey)):'';
+  let s;
+  if(f==='w'||!J)s=(o.bare?W+aw:W+'年'+aw);
+  else if(f==='j')s=J+'年'+aj;
+  else if(f==='wj')s=`${W}（${J}${aj}）年`;
+  else if(f==='jw')s=`${J}（${W}${aw}）年`;
+  else if(f==='w_j')s=`${W}年（${J}年${aj}）`;
+  else s=`${J}年（${W}年${aw}）`;
+  if(dt.est){s=o.bare||!s.includes('年')?s+'頃':s.replace('年','年頃');}
+  if(!o.yearOnly&&I.m){s+=I.m+'月'+(I.d?I.d+'日':'');}
+  return o.vert?kanText(s):s;
+}
+function parseDateText(str){
+  str=String(str||'').trim();if(!str)return null;
+  const mon={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+  let m=str.match(/^(?:ABT|EST|CAL|BEF|AFT)?\s*(?:(\d{1,2})\s+)?(?:([A-Z]{3})\s+)?(\d{3,4})$/i);
+  if(m)return{src:'w',y:+m[3],m:m[2]?mon[m[2].toUpperCase()]||null:null,d:m[1]&&m[2]?+m[1]:null};
+  m=str.match(/^(\d{3,4})(?:[\/\-.年](\d{1,2}))?(?:[\/\-.月](\d{1,2}))?日?(?:年)?$/);
+  if(m)return{src:'w',y:+m[1],m:m[2]?+m[2]:null,d:m[3]?+m[3]:null};
+  m=str.match(/^([^\d元]{2,4}?)(元|\d{1,2})年?(?:(\d{1,2})月)?(?:(\d{1,2})日)?$/);
+  if(m){const e=JP_BY_NAME.get(normJ(m[1]));if(e)return{src:'j',eid:e.id,y:m[2]==='元'?1:+m[2],m:m[3]?+m[3]:null,d:m[4]?+m[4]:null};}
+  return{raw:str};
+}
+function migrateDate(dt){if(dt&&dt.src==='j'&&!dt.eid&&dt.era){const e=JP_BY_NAME.get(dt.era);if(e){dt.eid=e.id;delete dt.era;}}return dt;}
+function migratePerson(p){
+  if(p.yomi!==undefined&&p.seiYomi===undefined&&p.meiYomi===undefined){const parts=String(p.yomi||'').trim().split(/[\s　]+/).filter(Boolean);
+    if(parts.length===2){p.seiYomi=parts[0];p.meiYomi=parts[1];delete p.yomi;}else if(!parts.length){delete p.yomi;}}
+  if(p.bd===undefined){p.bd=parseDateText(p.birth);}
+  if(p.dd===undefined){p.dd=parseDateText(p.death);}
+  migrateDate(p.bd);migrateDate(p.dd);
+  delete p.birth;delete p.death;
+}
+function gedDate(dt,cal){const I=dateInfo(dt,cal);if(!I)return dt&&dt.raw?dt.raw:'';
+  const M=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  if(I.approxW||I.approxJ||I.wy<GREG_Y[I.era?I.era.c:'jp'])return 'ABT '+I.wy;
+  return (I.d&&I.m?I.d+' ':'')+(I.m?M[I.m-1]+' ':'')+I.wy;}
+
+/* ---------- 先祖（直系尊属）・子孫（直系卑属） ---------- */
+let relMap=new Map();
+const ANC_BASE=[null,['父','母','親'],['祖父','祖母','祖父母'],['曽祖父','曽祖母','曽祖父母'],['高祖父','高祖母','高祖父母']];
+function ancLabel(d,sex,side,adopt){
+  const i=sex==='m'?0:sex==='f'?1:2;
+  let s=d<ANC_BASE.length?ANC_BASE[d][i]:`${d}代前の祖先`;
+  if(d===1)return (adopt?'養':'')+s;
+  return (side?side+'の':'')+s+(adopt?'（養）':'');
+}
+const DESC_BASE=[null,'子','孫','ひ孫','玄孫'];
+function descLabel(d,sex,adopt){
+  if(d===1)return adopt?(sex==='f'?'養女':'養子'):(sex==='m'?'息子':sex==='f'?'娘':'子');
+  return (d<DESC_BASE.length?DESC_BASE[d]:`${d}代後の子孫`)+(adopt?'（養）':'');
+}
+const spWord=(sex,f)=>(f&&f.kind==='d'?'元':'')+(sex==='f'?'妻':sex==='m'?'夫':'配偶者');
+function ancSet(F,N){
+  const set=new Set([F]);relMap=new Map([[F,'本人']]);
+  let fr=[{id:F,d:0,side:''}];
+  while(fr.length){const nx=[];
+    fr.forEach(o=>{if(o.d>=N)return;
+      childFams(o.id).forEach(f=>{if(hiddenLink(f,o.id))return;const t=ctype(f,o.id);if(t==='step'||t==='yushi')return;
+        f.spouses.forEach(s=>{const ps=P(s);if(!ps||set.has(s))return;set.add(s);
+          const side=o.side||(ps.sex==='m'?'父方':ps.sex==='f'?'母方':'');
+          relMap.set(s,ancLabel(o.d+1,ps.sex,side,t==='adopt'||t==='special'));nx.push({id:s,d:o.d+1,side});});});});
+    fr=nx;}
+  return set;
+}
+function descSet(F,N){
+  const set=new Set([F]);relMap=new Map([[F,'本人']]);
+  spouseFams(F).forEach(f=>f.spouses.forEach(s=>{if(s!==F&&P(s)&&!set.has(s)){set.add(s);relMap.set(s,spWord(P(s).sex,f));}}));
+  let fr=[{id:F,d:0}];
+  while(fr.length){const nx=[];
+    fr.forEach(o=>{if(o.d>=N)return;
+      spouseFams(o.id).forEach(f=>f.children.forEach(c=>{const pc=P(c);if(!pc||hiddenLink(f,c))return;const t=ctype(f,c);if(t==='step'||t==='yushi')return;
+        if(set.has(c)){if((t==='bio'||t==='ninchi')&&/養/.test(relMap.get(c)||''))relMap.set(c,descLabel(o.d+1,pc.sex,false));return;}
+        set.add(c);relMap.set(c,descLabel(o.d+1,pc.sex,t==='adopt'||t==='special'));nx.push({id:c,d:o.d+1});
+        if(o.d+1<=N)spouseFams(c).forEach(g=>g.spouses.forEach(s=>{if(s!==c&&P(s)&&!set.has(s)){set.add(s);relMap.set(s,(DESC_BASE[o.d+1]||`${o.d+1}代後の子孫`)+'の'+spWord(P(s).sex,g));}}));}));});
+    fr=nx;}
+  return set;
+}
+/* 扇形の先祖図 */
+function drawFan(opt){
+  opt=opt||{};
+  const all=Object.keys(S.persons);if(!all.length)return{svg:'',bbox:null,pos:new Map()};
+  const F=P(ui.focus)?ui.focus:(P(ui.sel)?ui.sel:all[0]);ui.focus=F;
+  const N=Math.min(ui.depth||4,7),T=theme(),SC=sexColors(),font=fontStack(false);
+  const R0=62,W=N<=4?90:N<=5?80:72,pos=new Map();
+  const pt=(r,a)=>[r*Math.cos(a),-r*Math.sin(a)];
+  const f1=n=>n.toFixed(1);
+  let out='';
+  // 中心
+  const fp=P(F);
+  const lab=(p,hide)=>hide==='anon'?'存命の方':dispName(p,' ');
+  const yr=p=>{const b=fmtDate(birthDt(p),{yearOnly:true,bare:true,cal:calOf(p),fmt:'w'}),d=p.living?'':fmtDate(p.dd,{yearOnly:true,bare:true,cal:calOf(p),fmt:'w'});return b||d?`${b||'?'}–${d}`:'';};
+  out+=`<g data-id="${F}" style="cursor:pointer"><path d="M${-R0} 0A${R0} ${R0} 0 0 1 ${R0} 0Z" fill="${T.card}" stroke="${opt.sel===F?T.sel:T.stroke}" stroke-width="${opt.sel===F?3:1.2}"/>
+    <text x="0" y="-26" text-anchor="middle" font-size="15" font-weight="700" fill="${T.ink}">${esc(lab(fp,fp.living&&opt.hide))}</text>
+    <text x="0" y="-9" text-anchor="middle" font-size="10.5" fill="${T.sub}">${esc(fp.living&&opt.hide?'':yr(fp))}</text></g>`;
+  pos.set(F,{x:0,y:-30});
+  const parentsOf=id=>{const f=primaryFam(id);if(!f)return[null,null];const sp=f.spouses.map(P).filter(Boolean);
+    const fa=sp.find(p=>p.sex==='m')||null,mo=sp.find(p=>p.sex==='f')||null;const rest=sp.filter(p=>p!==fa&&p!==mo);
+    return[fa||rest.shift()||null,mo||rest.shift()||null];};
+  let gen=[fp];
+  for(let k=1;k<=N;k++){
+    const nx=[];gen.forEach(p=>{if(!p){nx.push(null,null);return;}nx.push(...parentsOf(p.id));});
+    const r1=R0+(k-1)*W,r2=R0+k*W,n=nx.length,da=Math.PI/n;
+    nx.forEach((p,i)=>{
+      const a1=Math.PI-i*da,a2=Math.PI-(i+1)*da,am=(a1+a2)/2,rm=(r1+r2)/2;
+      const [x1,y1]=pt(r2,a1),[x2,y2]=pt(r2,a2),[x3,y3]=pt(r1,a2),[x4,y4]=pt(r1,a1);
+      const d=`M${f1(x1)} ${f1(y1)}A${r2} ${r2} 0 0 1 ${f1(x2)} ${f1(y2)}L${f1(x3)} ${f1(y3)}A${r1} ${r1} 0 0 0 ${f1(x4)} ${f1(y4)}Z`;
+      if(!p){out+=`<path d="${d}" fill="none" stroke="${T.stroke}" stroke-width="0.8" stroke-dasharray="3 3"/>`;return;}
+      const sel=opt.sel===p.id,hide=p.living&&opt.hide;
+      const [cx,cy]=pt(rm,am);pos.set(p.id,{x:cx,y:cy});
+      let g=`<g data-id="${p.id}" style="cursor:pointer"><path d="${d}" fill="${T.card}" stroke="${sel?T.sel:T.stroke}" stroke-width="${sel?3:1}"/>`;
+      if(SC){const [s1x,s1y]=pt(r1+4,a1-da*0.08),[s2x,s2y]=pt(r1+4,a2+da*0.08);g+=`<path d="M${f1(s1x)} ${f1(s1y)}A${r1+4} ${r1+4} 0 0 1 ${f1(s2x)} ${f1(s2y)}" fill="none" stroke="${SC[p.sex]||SC.u}" stroke-width="3"/>`;}
+      const nm=lab(p,hide),y=hide?'':yr(p);
+      const arc=rm*da,deg=am*180/Math.PI;
+      if(k<=2&&arc>70){
+        const rot=90-deg,fs=Math.min(14,(arc-10)/Math.max(nm.length,1)*1.6);
+        g+=`<g transform="translate(${f1(cx)} ${f1(cy)}) rotate(${f1(rot)})"><text y="-2" text-anchor="middle" font-size="${f1(fs)}" font-weight="700" fill="${T.ink}">${esc(nm)}</text>${y?`<text y="13" text-anchor="middle" font-size="10" fill="${T.sub}">${esc(y)}</text>`:''}</g>`;
+      }else{
+        let rot=-deg;if(deg>90)rot+=180;
+        const fs=Math.max(7,Math.min(13,(W-12)/Math.max(textW(nm,1),1)));const fs2=Math.min(9.5,arc/2.4);
+        const two=arc>=24&&y;
+        g+=`<g transform="translate(${f1(cx)} ${f1(cy)}) rotate(${f1(rot)})"><text y="${two?-1:4}" text-anchor="middle" font-size="${f1(Math.min(fs,arc*0.62))}" font-weight="700" fill="${T.ink}">${esc(nm)}</text>${two?`<text y="${f1(fs2+2)}" text-anchor="middle" font-size="${f1(fs2)}" fill="${T.sub}">${esc(y)}</text>`:''}</g>`;
+      }
+      out+=g+'</g>';
+    });
+    gen=nx;
+  }
+  const RR=R0+N*W;
+  return{svg:`<g font-family='${font}'>${out}</g>`,bbox:{x:-RR-10,y:-RR-10,w:2*RR+20,h:RR+30},pos};
+}
+
+/* ---------- 巻物モード ---------- */
+const SW=52,SSG=22,SGAP=26,SGAPC=28,S_NT=46,S_RAIL=24,S_EQ=60,S_NS=19;
+const KD='〇一二三四五六七八九';
+function kanNum(n){if(n<=0||n>=100)return toKan(String(n));if(n<10)return KD[n];const t=Math.floor(n/10),o=n%10;return (t>1?KD[t]:'')+'十'+(o?KD[o]:'');}
+function parseKan(s){s=toHalf(s||'').trim();if(!s)return NaN;if(/^\d+$/.test(s))return +s;let n=0,cur=0;
+  for(const ch of s){if(ch==='十'){n+=(cur||1)*10;cur=0;}else{const d=KD.indexOf(ch);if(d<0)return NaN;cur=d;}}return n+cur;}
+const daiLabel=n=>n===1?'初代':kanNum(n)+'代';
+function parseDai(s){s=String(s||'').replace(/[代目\s]/g,'');if(s==='初')return 1;return parseKan(s);}
+function pickHeir(kids){return kids.find(k=>P(k).heir)||kids.find(k=>P(k).sex==='m')||kids[0];}
+const childrenOf=id=>[...new Set(spouseFams(id).flatMap(f=>f.children.filter(c=>!hiddenLink(f,c))))].filter(c=>P(c));
+const famWith=(id,c)=>spouseFams(id).find(f=>f.children.includes(c));
+// 続柄（自動＋手入力。手入力の番号から後ろが自動でずれる）
+function zokuMap(){
+  const out=new Map();
+  S.families.forEach(f=>{const cnt={m:0,f:0};
+    f.children.forEach(c=>{const p=P(c);if(!p)return;const t=ctype(f,c);
+      const man=toHalf(p.zoku||'').trim();let auto='';
+      if(t==='bio'||t==='special'){
+        const mm=man.match(/^(長|[一二三四五六七八九十〇0-9]+)(男|女)$/);
+        if(mm){const k=mm[2]==='男'?'m':'f';cnt[k]=mm[1]==='長'?1:parseKan(mm[1])||cnt[k]+1;}
+        else if(p.sex==='m'||p.sex==='f'){cnt[p.sex]++;}
+        if(p.sex==='m'||p.sex==='f'){const k=p.sex,n=cnt[k];auto=(n===1?'長':kanNum(n))+(k==='m'?'男':'女');}else auto='子';
+      }else if(t==='adopt')auto=p.sex==='f'?'養女':'養子';
+      else if(t==='step')auto='継子';
+      else if(t==='yushi')auto='猶子';
+      else auto='認知';
+      if(primaryFam(c)===f)out.set(c,{auto,show:man||auto});
+    });});
+  return out;
+}
+function heirChain(root){const ch=[];const seen=new Set();let c=root;
+  while(c&&!seen.has(c)){seen.add(c);ch.push(c);const k=childrenOf(c);c=k.length?pickHeir(k):null;}return ch;}
+// 代数（自動。どこかの人を◯代目にすると前後が全部合わせてずれる）
+function daiMap(root){
+  const ch=heirChain(root),out=new Map();
+  const ov=ch.map((id,i)=>({i,n:parseDai(P(id).dai)})).filter(o=>o.n>0);
+  ch.forEach((id,i)=>{let n;
+    const prev=ov.filter(o=>o.i<=i).pop();
+    if(prev)n=prev.n+(i-prev.i);else if(ov.length)n=ov[0].n-(ov[0].i-i);else n=1+i;
+    out.set(id,n);});
+  return out;
+}
+function descCount(id,seen=new Set()){if(seen.has(id))return 0;seen.add(id);return 1+childrenOf(id).reduce((s,c)=>s+descCount(c,seen),0);}
+function autoRoot(){
+  const ids=Object.keys(S.persons);
+  const top=ids.filter(id=>!parentFam(id));
+  let best=null,bs=-1;
+  top.forEach(id=>{const sc=descCount(id)*2+(P(id).sex==='m'?1:0);if(sc>bs){bs=sc;best=id;}});
+  return best||ids[0];
+}
+const scrollRoot=()=>{const m=S.meta||{};return P(m.root)?m.root:autoRoot();};
+function scrollBlock(id,cont,seen){
+  seen.add(id);
+  const items=[],segs=[],L=[],R=[];
+  const sps=[...new Set(spouseFams(id).flatMap(f=>f.spouses))].filter(s=>s!==id&&!seen.has(s)&&P(s));
+  sps.forEach(s=>seen.add(s));
+  items.push({id,cx:-SW/2,row:0,role:'b'});
+  sps.forEach((s,i)=>{const cx=-SW/2-(i+1)*(SW+SSG);items.push({id:s,cx,row:0,role:'s'});
+    const fm=spouseFams(id).filter(f=>f.spouses.includes(s)).pop();const kind=fm&&fm.kind||'m';
+    const xm=cx+SW/2+SSG/2,st=kind==='n'?'d':'s';segs.push([xm-8,0,S_EQ-3,xm+8,0,S_EQ-3,st],[xm-8,0,S_EQ+3,xm+8,0,S_EQ+3,st]);
+    if(kind==='d')segs.push([xm-5,0,S_EQ+9,xm-1,0,S_EQ-9,'s'],[xm+1,0,S_EQ+9,xm+5,0,S_EQ-9,'s']);
+    if(fm&&fm.no)items.push({label:circ(fm.no),cx:xm,row:0,y:S_EQ-14});});
+  L[0]=-SW-sps.length*(SW+SSG);R[0]=0;
+  const kids=childrenOf(id).filter(c=>!seen.has(c));
+  if(!kids.length)return{items,segs,L,R};
+  const heir=pickHeir(kids);
+  const order=kids.filter(k=>k!==heir).concat([heir]);
+  const x0=sps.length?-SW-SSG/2:-SW-4;
+  if(!sps.length)segs.push([-SW/2-10,0,S_EQ,x0,0,S_EQ]);
+  const cr=cont?0:1;
+  const start=cont?x0-SGAPC:0;
+  const ccx=[];
+  order.forEach(c=>{
+    if(seen.has(c))return;
+    const sub=scrollBlock(c,c===heir,seen);
+    let a=start;
+    sub.L.forEach((_,k)=>{const rr=cr+k;if(L[rr]!==undefined)a=Math.min(a,L[rr]-SGAP-sub.R[k]);});
+    sub.items.forEach(it=>items.push({...it,cx:it.cx+a,row:it.row+cr}));
+    sub.segs.forEach(s=>segs.push([s[0]+a,s[1]+cr,s[2],s[3]+a,s[4]+cr,s[5],s[6]]));
+    sub.L.forEach((v,k)=>{const rr=cr+k;L[rr]=L[rr]===undefined?v+a:Math.min(L[rr],v+a);R[rr]=R[rr]===undefined?sub.R[k]+a:Math.max(R[rr],sub.R[k]+a);});
+    const fw=famWith(id,c);ccx.push([a-SW/2,stOf(fw?ctype(fw,c):'bio')]);
+  });
+  if(cont)segs.push([x0,0,sps.length?S_EQ-3:S_EQ,x0,0,S_RAIL]);
+  else segs.push([x0,0,sps.length?S_EQ+3:S_EQ,x0,1,S_RAIL]);
+  const xs=ccx.map(c=>c[0]).concat([x0]);segs.push([Math.min(...xs),cr,S_RAIL,Math.max(...xs),cr,S_RAIL]);
+  ccx.forEach(([cx,st])=>segs.push([cx,cr,S_RAIL,cx,cr,S_NT-6,st]));
+  return{items,segs,L,R};
+}
+const vchars=s=>[...String(s).replace(/ー/g,'｜').replace(/[（(]/g,'︵').replace(/[）)]/g,'︶').replace(/[「]/g,'﹁').replace(/[」]/g,'﹂')];
+const kanText=s=>toHalf(s).replace(/\d+/g,n=>n.length<=2?kanNum(+n):toKan(n));
+function yearNote(s,suf){s=String(s||'').trim();if(!s)return '';return kanText(s)+(/年$/.test(s)?'':'年')+suf;}
+function drawScroll(opt){
+  opt=opt||{};
+  const ids=Object.keys(S.persons);
+  if(!ids.length)return{svg:'',bbox:null,pos:new Map()};
+  const T=theme(),SC=sexColors(),font=fontStack(true),meta=S.meta||{};
+  const root=scrollRoot();
+  const blk=scrollBlock(root,true,new Set());
+  const zk=zokuMap(),dai=daiMap(root);
+  const lbls=blk.items.filter(it=>it.label);
+  const info=blk.items.filter(it=>!it.label).map(it=>{const p=P(it.id);const hide=p.living&&opt.hide;
+    const nm=hide==='anon'?'存命の方':dispName(p,'');
+    let z=it.role==='s'?((p.zoku||'').trim()||(p.sex==='f'?'妻':p.sex==='m'?'夫':'')):(zk.get(it.id)||{}).show||'';
+    let mk='';
+    if(it.role==='s'){const fm=S.families.filter(f=>f.spouses.includes(it.id)&&f.spouses.some(x=>blk.items.some(b=>b.id===x&&b.role==='b'))).pop();
+      if(fm&&fm.kind==='d')mk=(fm.divY?kanText(fm.divY)+(/年$/.test(fm.divY)?'':'年'):'')+'離婚';else if(fm&&fm.kind==='n')mk='内縁';else if(fm&&fm.kind==='w')mk='死別';}
+    const pc=calOf(p),bd=birthDt(p);const bI=dateInfo(bd,pc);const bs=fmtDate(bd,{vert:true,cal:pc}),ds=fmtDate(p.dd,{vert:true,cal:pc});
+    const pf0=primaryFam(it.id);const ex=childFams(it.id).filter(f=>f!==pf0&&!hiddenLink(f,it.id)).map(f=>{const t=ctype(f,it.id),par=f.spouses.map(P).filter(Boolean)[0];return par&&t!=='bio'?dispName(par,'')+'の'+({adopt:'養子',special:'養子',step:'継子',ninchi:'子（認知）',yushi:'猶子'}[t]):'';}).filter(Boolean);
+    const notes=[z,...ex,mk,p.kyusei?'旧姓'+p.kyusei:'',p.fuShou?'父不詳':'',hide||!bs?'':bs+'生',hide||!settings.eto||!bI?'':eto(bI.wy),hide||p.living||!ds?'':ds+'没',p.early?'早世':''].filter(Boolean).map(kanText);
+    return{...it,p,nm,notes,dai:dai.get(it.id)};});
+  const maxName=Math.max(3,...info.map(i=>vchars(i.nm).length));
+  const maxNote=Math.max(3,...info.map(i=>Math.max(0,...i.notes.map(n=>[...n].length))));
+  const BH=S_NT+maxName*S_NS+12+maxNote*12+44;
+  const rows=blk.L.length;
+  const Y=(r,y)=>r*BH+y;
+  const PB={s:'',d:''};
+  const line=(b,x1,y1,x2,y2)=>{PB[b]+=`M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}`;};
+  blk.segs.forEach(s=>{const st=s[6]||'s',x1=s[0],y1=Y(s[1],s[2]),x2=s[3],y2=Y(s[4],s[5]);
+    if(st==='w'||st==='dd'){const b=st==='w'?'s':'d';if(Math.abs(x1-x2)<0.01){line(b,x1-2.2,y1,x2-2.2,y2);line(b,x1+2.2,y1,x2+2.2,y2);}else{line(b,x1,y1-2.2,x2,y2-2.2);line(b,x1,y1+2.2,x2,y2+2.2);}}
+    else line(st,x1,y1,x2,y2);});
+  const minL=Math.min(...blk.L);
+  const title=(meta.title||'').trim()||((P(root).sei||'')+'家系図');
+  const tch=vchars(title);
+  const H=Math.max(rows*BH,tch.length*36+90);
+  const px0=minL-110,px1=150,py0=-26,py1=H+20;
+  let out=`<rect x="${px0}" y="${py0}" width="${px1-px0}" height="${py1-py0}" fill="${T.card}" stroke="${T.stroke}"/>`;
+  out+=`<rect x="${px0+10}" y="${py0+10}" width="${px1-px0-20}" height="${py1-py0-20}" fill="none" stroke="${T.stroke}" stroke-width="0.8"/>`;
+  out+=`<path d="${PB.s}" fill="none" stroke="${T.line}" stroke-width="1.3" stroke-linecap="square"/><path d="${PB.d}" fill="none" stroke="${T.line}" stroke-width="1.3" stroke-dasharray="4 3"/>`;
+  lbls.forEach(l=>{out+=`<text x="${l.cx}" y="${Y(l.row,l.y)}" text-anchor="middle" font-size="10" fill="${T.sub}">${esc(l.label)}</text>`;});
+  let ty=34;tch.forEach(c=>{out+=`<text x="${px1-62}" y="${ty}" text-anchor="middle" font-size="30" font-weight="700" fill="${T.ink}">${esc(c)}</text>`;ty+=36;});
+  const credit=[meta.date,meta.author?'作成 '+meta.author:''].filter(Boolean);
+  credit.forEach((t,i)=>{const cs=vchars(kanText(t));let cy=py1-26-cs.length*15;const cx=px0+40+(credit.length-1-i)*20;
+    cs.forEach(c=>{cy+=15;out+=`<text x="${cx+(credit.length-1-i)*0}" y="${cy}" text-anchor="middle" font-size="13" fill="${T.sub}">${esc(c)}</text>`;});});
+  const pos=new Map();
+  info.forEach(it=>{
+    const cx=it.cx,top=Y(it.row,0),sel=opt.sel===it.id;
+    const nch=vchars(it.nm),hh=nch.length*S_NS+12+Math.max(0,...it.notes.map(n=>[...n].length))*12;
+    pos.set(it.id,{x:cx,y:top+S_NT+hh/2});
+    let g=`<g data-id="${it.id}" style="cursor:pointer"><rect x="${cx-SW/2+2}" y="${top+S_NT-8}" width="${SW-4}" height="${hh+12}" rx="4" fill="${sel?T.sel:'#fff'}" fill-opacity="${sel?0.12:0}" stroke="${sel?T.sel:'none'}" stroke-width="1.5"/>`;
+    if(SC)g+=`<rect x="${cx-3}" y="${top+S_NT-6}" width="6" height="2.5" rx="1" fill="${SC[it.p.sex]||SC.u}"/>`;
+    let y=top+S_NT+S_NS-3;
+    nch.forEach(c=>{g+=`<text x="${cx}" y="${y}" text-anchor="middle" font-size="18" font-weight="700" fill="${T.ink}">${esc(c)}</text>`;y+=S_NS;});
+    const ryS=settings.ruby&&!(it.p.living&&opt.hide==='anon')?fullYomi(it.p).replace(/\s/g,''):'';
+    if(ryS){const rc=[...ryS],st=Math.min(9,Math.max(nch.length*S_NS,rc.length*7)/rc.length);let ry2=top+S_NT+st-1;
+      rc.forEach(c=>{g+=`<text x="${cx+13}" y="${ry2}" text-anchor="middle" font-size="7.5" fill="${T.sub}">${esc(c)}</text>`;ry2+=st;});}
+    if(it.dai){let dy=top+S_NT+9;vchars(daiLabel(it.dai)).forEach(c=>{g+=`<text x="${cx+(ryS?23:20)}" y="${dy}" text-anchor="middle" font-size="10.5" fill="${T.sel}">${esc(c)}</text>`;dy+=11;});}
+    y+=6;
+    it.notes.forEach((n,i)=>{const nx=cx+14-i*14;let ny=y;vchars(n).forEach(c=>{ny+=12;g+=`<text x="${nx}" y="${ny}" text-anchor="middle" font-size="11" fill="${T.sub}">${esc(c)}</text>`;});});
+    out+=g+'</g>';
+  });
+  return{svg:`<g font-family='${font}'>${out}</g>`,bbox:{x:px0,y:py0,w:px1-px0,h:py1-py0},pos,scroll:true};
+}
+
+/* ---------- 画面 ---------- */
+const svgEl=$('#tree'),vp=$('#vp');
+function applyView(){vp.setAttribute('transform',`translate(${view.x} ${view.y}) scale(${view.s})`);}
+function renderTree(){
+  const r=drawTree({sel:ui.sel});vp.innerHTML=r.svg;last=r;applyView();
+  $('#empty').classList.toggle('show',!Object.keys(S.persons).length);
+}
+function render(keepView){
+  renderTree();renderSheet();updTop();
+}
+function updTop(){
+  document.querySelectorAll('#segView button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.view));
+  document.querySelectorAll('#segDir button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.dir));
+  const sc=ui.view==='scroll'||(ui.view==='anc'&&ui.fan);$('#segDir').style.opacity=sc?.35:1;$('#segDir').style.pointerEvents=sc?'none':'';
+  const ad=ui.view==='anc'||ui.view==='desc';$('#viewOpts').style.display=ad&&Object.keys(S.persons).length?'flex':'none';
+  if(ad){const fp=P(ui.focus);$('#voWho').textContent=(fp?nameOf(fp):'')+(ui.view==='anc'?' の先祖':' の子孫');
+    const mx=ui.view==='anc'&&ui.fan?7:10;$('#voDepth').innerHTML=Array.from({length:mx},(_,i)=>`<option value="${i+1}"${(ui.depth||4)===i+1?' selected':''}>${i+1}</option>`).join('');
+    $('#voFanL').style.display=ui.view==='anc'?'flex':'none';$('#voFan').checked=!!ui.fan;$('#voRel').checked=ui.rel!==false;$('#voRel').parentNode.style.display=ui.view==='anc'&&ui.fan?'none':'flex';}
+  $('#bScrollSet').style.display=ui.view==='scroll'&&Object.keys(S.persons).length?'':'none';
+  $('#bUndo').disabled=!undoStack.length;$('#bRedo').disabled=!redoStack.length;
+}
+let shownSel=null;
+function renderSheet(){
+  const sh=$('#sheet');const p=P(ui.sel);
+  sh.classList.toggle('open',!!p);document.body.classList.toggle('sheet-open',!!p);
+  sh.classList.toggle('expand',!!ui.expand);
+  if(!p){shownSel=null;if(WZ){WZ=null;sh.classList.remove('wizmode');}return;}
+  sh.classList.toggle('wizmode',!!(WZ&&WZ.id===ui.sel));
+  $('#shName').textContent=nameOf(p);
+  if(shownSel!==ui.sel){fillForm(p);shownSel=ui.sel;}
+  const f=parentFam(ui.sel);const i=f?f.children.indexOf(ui.sel):-1;
+  $('#bUp').disabled=!f||i<=0;$('#bDown').disabled=!f||i>=f.children.length-1;
+  const SCx=sexColors();
+  document.querySelectorAll('#fSex button').forEach(b=>{b.classList.toggle('on',b.dataset.v===p.sex);const d=b.querySelector('.sexdot');d.style.display=SCx?'':'none';if(SCx)d.style.background=SCx[b.dataset.v];});
+  $('#dtD').querySelectorAll('input,select').forEach(e=>e.disabled=!!p.living);
+  datePreview();
+  const z=zokuMap().get(ui.sel);$('#fZoku').placeholder=z?'自動：'+z.auto:'（親がいないと自動なし）';
+  const d=daiMap(scrollRoot()).get(ui.sel);$('#fDai').placeholder=d?'自動：'+daiLabel(d):'当主の流れの人だけ';
+  renderRel(p);renderYomiAlt(p);
+}
+function fillForm(p){
+  $('#fCal').value=p.cal||'jp';writeDate($('#dtB'),p.bd);writeDate($('#dtD'),p.dd);
+  $('#fKazoe').value=p.kazoe||'';$('#fEarly').checked=!!p.early;$('#fFu').checked=!!p.fuShou;
+  ['sei','mei','seiYomi','meiYomi','note','kyusei','kyonen'].forEach(k=>{$('#f'+k[0].toUpperCase()+k.slice(1)).value=p[k]||'';});
+  $('#fLiving').checked=!!p.living;$('#fZoku').value=p.zoku||'';$('#fDai').value=p.dai||'';$('#fHeir').checked=!!p.heir;
+}
+function openEditor(focusName){
+  ui.expand=true;renderSheet();
+  if(focusName){const p=P(ui.sel);const el=p&&p.sei?$('#fMei'):$('#fSei');el.focus();}
+}
+function select(id){
+  if(WZ&&id!==WZ.id){WZ=null;shownSel=null;document.body.classList.remove('wiz-on');$('#sheet').classList.remove('wizmode');}
+  ui.sel=id;
+  if(id&&ui.view==='focus'&&ui.focus!==id){ui.focus=id;render();fit();return;}
+  if(!id)ui.expand=false;
+  render();
+}
+
+/* ---------- 表示操作（移動・拡大） ---------- */
+function stageRect(){return svgEl.getBoundingClientRect();}
+function fit(){
+  const b=last.bbox;if(!b)return;const r=stageRect();
+  let H=r.height;if(document.body.classList.contains('sheet-open')&&innerWidth<=700)H=r.height*0.4;
+  if(last.scroll){const s=Math.min((H-30)/b.h,1.2,Math.max((r.width-30)/b.w,0.55));view.s=Math.max(s,0.08);
+    const sw=view.s*b.w;view.x=(sw<r.width?(r.width+sw)/2:r.width-15)-view.s*(b.x+b.w);view.y=H/2-view.s*(b.y+b.h/2);applyView();return;}
+  const s=Math.min((r.width-40)/b.w,(H-40)/b.h,1.4);view.s=Math.max(s,0.08);
+  view.x=r.width/2-view.s*(b.x+b.w/2);view.y=H/2-view.s*(b.y+b.h/2);applyView();
+}
+function zoomAt(f,cx,cy){const ns=Math.min(4,Math.max(0.05,view.s*f));const k=ns/view.s;view.x=cx-(cx-view.x)*k;view.y=cy-(cy-view.y)*k;view.s=ns;applyView();}
+function ensureVisible(id){
+  const p=last.pos.get(id);if(!p)return;const r=stageRect();
+  const sx=view.x+view.s*p.x,sy=view.y+view.s*p.y;
+  const mobile=innerWidth<=700&&document.body.classList.contains('sheet-open');
+  const maxY=mobile?r.height*0.36:r.height-60;
+  if(sx<60||sx>r.width-60||sy<60||sy>maxY){view.x+=r.width/2-sx;view.y+=(mobile?r.height*0.2:r.height/2)-sy;applyView();}
+}
+const ptrs=new Map();let drag=null,pinch=null,downTarget=null,moved=false;
+svgEl.addEventListener('pointerdown',e=>{
+  svgEl.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===1){downTarget=e.target;moved=false;drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};svgEl.classList.add('dragging');}
+  else if(ptrs.size===2){const [a,b]=[...ptrs.values()];moved=true;
+    pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,s:view.s,vx:view.x,vy:view.y};}
+});
+svgEl.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const r=stageRect();
+  if(ptrs.size===2&&pinch){const [a,b]=[...ptrs.values()];
+    const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
+    const ns=Math.min(4,Math.max(0.05,pinch.s*d/pinch.d));
+    const wx=(pinch.mx-r.left-pinch.vx)/pinch.s,wy=(pinch.my-r.top-pinch.vy)/pinch.s;
+    view.s=ns;view.x=mx-wx*ns;view.y=my-wy*ns;applyView();
+  }else if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+    if(Math.hypot(dx,dy)>5)moved=true;
+    if(moved){view.x=drag.vx+dx;view.y=drag.vy+dy;applyView();}}
+});
+const endPtr=e=>{
+  if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);
+  if(ptrs.size===0){
+    svgEl.classList.remove('dragging');
+    if(!moved&&drag&&e.type==='pointerup'){const g=downTarget&&downTarget.closest&&downTarget.closest('[data-id]');select(g?g.dataset.id:null);}
+    drag=null;pinch=null;
+  }else if(ptrs.size===1){pinch=null;const [a]=[...ptrs.values()];drag={x:a.x,y:a.y,vx:view.x,vy:view.y};}
+};
+svgEl.addEventListener('pointerup',endPtr);svgEl.addEventListener('pointercancel',endPtr);
+svgEl.addEventListener('wheel',e=>{e.preventDefault();const r=stageRect();zoomAt(Math.exp(-e.deltaY*0.0015),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+$('#zIn').onclick=()=>{const r=stageRect();zoomAt(1.25,r.width/2,r.height/2);};
+$('#zOut').onclick=()=>{const r=stageRect();zoomAt(0.8,r.width/2,r.height/2);};
+$('#zFit').onclick=fit;
+
+/* ---------- 編集パネル ---------- */
+let armed=false;
+document.querySelectorAll('.form [data-f]').forEach(el=>{
+  el.addEventListener('focus',()=>{armed=true;});
+  el.addEventListener('input',()=>{const p=P(ui.sel);if(!p)return;if(armed){snapshot();armed=false;}
+    p[el.dataset.f]=el.value;$('#shName').textContent=nameOf(p);renderTree();save();});
+});
+$('#fLiving').addEventListener('change',e=>{const p=P(ui.sel);if(!p)return;snapshot();p.living=e.target.checked;save();renderTree();renderSheet();});
+document.querySelectorAll('#fSex button').forEach(b=>b.onclick=()=>{const p=P(ui.sel);if(!p||p.sex===b.dataset.v)return;snapshot();p.sex=b.dataset.v;save();render();});
+document.querySelectorAll('.act').forEach(b=>b.onclick=()=>{const id=ui.sel;if(!id)return;
+  ({parent:addParent,spouse:addSpouse,sibling:addSibling,child:addChild})[b.dataset.act](id);});
+$('#bDel').onclick=()=>{if(ui.sel)delPerson(ui.sel);};
+$('#bUp').onclick=()=>moveSib(ui.sel,-1);$('#bDown').onclick=()=>moveSib(ui.sel,1);
+$('#bExpand').onclick=()=>{ui.expand=!ui.expand;renderSheet();};
+$('#bCenter').onclick=()=>{if(!ui.sel)return;if(!['anc','desc'].includes(ui.view))ui.view='focus';ui.focus=ui.sel;save();render();fit();};
+$('#shClose').onclick=()=>select(null);
+$('#fHeir').addEventListener('change',e=>{const p=P(ui.sel);if(!p)return;snapshot();p.heir=e.target.checked;
+  if(p.heir){const f=parentFam(ui.sel);if(f)f.children.forEach(c=>{if(c!==ui.sel&&P(c))P(c).heir=false;});}save();render();});
+/* ---------- 年月日の入力欄（元号は打って探す） ---------- */
+const zen=s=>String(s).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).trim();
+const eraOptLabel=e=>`${e.n}（${e.c==='jp'?'日本'+(e.t?'・'+e.t:''):e.dy}　${westYear(e.s)}〜${e.e>3000?'':westYear(e.e)}）`;
+function eraSearch(q,cal){
+  q=normJ(zen(q).replace(/\s/g,''));
+  const pref=calCountry(cal||'jp');
+  let list=[{id:'w',label:'西暦',key:'西暦'}];
+  if(!q)return list.concat(ERAS.filter(e=>e.c==='jp'&&e.s>=1868).reverse().map(e=>({id:e.id,label:eraOptLabel(e)})));
+  const hit=ERAS.filter(e=>normJ(e.n).includes(q)||(q.length>=2&&normJ(e.dy+e.n).includes(q)));
+  hit.sort((a,b)=>((normJ(b.n)===q)-(normJ(a.n)===q))||((b.c===pref)-(a.c===pref))||(a.s-b.s));
+  if(!'西暦'.includes(q))list=[];
+  return list.concat(hit.slice(0,40).map(e=>({id:e.id,label:eraOptLabel(e)})));
+}
+function eraInputLabel(id){if(!id||id==='w')return '西暦';const e=ERA_BY_ID.get(id);return e?(e.c==='jp'?e.n:e.dy.replace(/（.*）/,'')+' '+e.n):'西暦';}
+function readDate(box){
+  const eid=box.dataset.eid||'w',ys=zen(box.querySelector('.dY').value);
+  if(!ys)return null;
+  const y=ys==='元'?1:parseInt(ys,10);if(!(y>0)&&!(eid==='w'&&/^-?\d+$/.test(ys)))return{raw:ys};
+  const mm=parseInt(zen(box.querySelector('.dM').value),10),dd=parseInt(zen(box.querySelector('.dD').value),10);
+  const m=mm>=1&&mm<=12?mm:null,d=m&&dd>=1&&dd<=31?dd:null;
+  return eid==='w'?{src:'w',y,m,d}:{src:'j',eid,y,m,d};
+}
+function writeDate(box,dt){
+  let eid='w';
+  if(dt&&!dt.raw&&dt.src==='j'){migrateDate(dt);eid=dt.eid||'w';}
+  box.dataset.eid=eid;box.querySelector('.dEraIn').value=eraInputLabel(eid);
+  box.querySelector('.dY').value=!dt?'':dt.raw?dt.raw:(dt.src==='j'&&dt.y===1?'元':dt.y);
+  box.querySelector('.dM').value=dt&&dt.m||'';box.querySelector('.dD').value=dt&&dt.d||'';
+}
+function datePreview(){
+  const p=P(ui.sel);if(!p)return;const cal=calOf(p);
+  [['bd','#pvB','生'],['dd','#pvD','没']].forEach(([k,id,suf])=>{
+    let dt=p[k];let t='';
+    if(k==='bd'&&!dt){const est=birthDt(p);if(est){const I=dateInfo(est,cal);$(id).textContent='→ 享年から推定：'+fmtDate(est,{fmt:'wj',cal})+'生';return;}}
+    if(dt&&dt.raw)t='（読み取れない日付：'+dt.raw+'）';
+    else{const I=dateInfo(dt,cal);
+      if(I){const fmts=['wj','jw','w_j','j_w'].includes(settings.datefmt)?settings.datefmt:'wj';
+        t='→ '+fmtDate(dt,{fmt:fmts,cal})+suf;
+        if(k==='bd'&&settings.eto)t+='　'+eto(I.wy)+'（'+etoYomi(I.wy)+'）';
+        if(I.wy<GREG_Y[I.era?I.era.c:calCountry(cal)])t+='　※旧暦';}}
+    $(id).textContent=t;});
+}
+function setEra(box,eid){
+  const p=P(ui.sel);if(!p)return;const k=box.dataset.k;snapshot();
+  const I=dateInfo(p[k],calOf(p));
+  if(I){let ny;if(eid==='w')ny=I.wy;else{const e=ERA_BY_ID.get(eid);ny=I.wy-e.s+1;}
+    if(eid==='w'||ny>=1)box.querySelector('.dY').value=eid!=='w'&&ny===1?'元':ny;}
+  box.dataset.eid=eid;box.querySelector('.dEraIn').value=eraInputLabel(eid);
+  p[k]=readDate(box);datePreview();renderTree();save();
+}
+let dArmed=false;
+document.querySelectorAll('.dt').forEach(box=>{
+  const k=box.dataset.k;
+  box.querySelectorAll('.dY,.dM,.dD').forEach(inp=>{
+    inp.addEventListener('focus',()=>{dArmed=true;});
+    inp.addEventListener('input',()=>{const p=P(ui.sel);if(!p)return;if(dArmed){snapshot();dArmed=false;}
+      p[k]=readDate(box);datePreview();renderTree();save();});
+  });
+  const ein=box.querySelector('.dEraIn'),sug=box.querySelector('.dSug');
+  const show=()=>{const p=P(ui.sel);const items=eraSearch(ein.value===eraInputLabel(box.dataset.eid)?'':ein.value,calOf(p));
+    sug.innerHTML=items.length?items.map(it=>`<div data-id="${esc(it.id)}">${esc(it.label)}</div>`).join(''):'<div class="none">見つかりません</div>';sug.classList.add('open');};
+  ein.addEventListener('focus',()=>{ein.select();show();});
+  ein.addEventListener('input',show);
+  ein.addEventListener('keydown',e=>{if(e.key==='Enter'){const f=sug.querySelector('[data-id]');if(f){e.preventDefault();setEra(box,f.dataset.id);sug.classList.remove('open');ein.blur();}}
+    else if(e.key==='Escape'){e.stopPropagation();sug.classList.remove('open');ein.value=eraInputLabel(box.dataset.eid);ein.blur();}});
+  sug.addEventListener('pointerdown',e=>{const d=e.target.closest('[data-id]');if(!d)return;e.preventDefault();setEra(box,d.dataset.id);sug.classList.remove('open');ein.blur();});
+  ein.addEventListener('blur',()=>{setTimeout(()=>{sug.classList.remove('open');ein.value=eraInputLabel(box.dataset.eid);},120);});
+});
+// 暦（どこの元号で書く人か）
+(function(){const sel=$('#fCal');
+  let h='<option value="jp">日本</option><option value="jpN">日本（南北朝は北朝で）</option><option value="kr">朝鮮</option><option value="cn">中国（王朝は自動）</option><optgroup label="中国：王朝を指定">';
+  CN_DYNS.forEach(d=>{h+=`<option value="cn:${esc(d)}">${esc(d)}（${westYear(DYN_SPAN[d].s)}〜${DYN_SPAN[d].e>3000?'':westYear(DYN_SPAN[d].e)}）</option>`;});
+  sel.innerHTML=h+'</optgroup>';
+  sel.addEventListener('change',()=>{const p=P(ui.sel);if(!p)return;snapshot();p.cal=sel.value==='jp'?undefined:sel.value;if(!p.cal)delete p.cal;datePreview();renderTree();save();});
+})();
+
+/* ---------- 西暦・元号・干支の対応表 ---------- */
+let etCols={jp:true,cn:true,kr:false,gak:false};let schoolY=null,schoolEarly=null,schoolWho='';
+function eraCell(y,c){
+  const list=erasInYear(y,c);
+  if(!list.length)return c==='kr'?'<span class="k">（中国元号）</span>':c==='jp'&&y<645?'':'<span class="k">—</span>';
+  return list.map(e=>{const n=y-e.s+1;const lab=(c==='jp'||e.n==='民國'?'':e.dy.replace(/（.*）/,'')+' ')+e.n+(n===1?'元':n)+(e.t?'<span class="k">（'+e.t[0]+'）</span>':'');return lab;}).join('・');
+}
+function eraTable(c){
+  c=Math.max(-200,Math.min(2200,c|0));$('#etYear').value=c;
+  const now=new Date().getFullYear();
+  const cols=['jp','cn','kr'].filter(k=>etCols[k]);
+  $('#etWrap').classList.toggle('gak',!!etCols.gak);renderSchool();
+  const head={jp:'日本',cn:'中国',kr:'朝鮮'};
+  let h='<table><thead><tr><th>西暦</th>'+cols.map(k=>`<th>${head[k]}</th>`).join('')+'<th>干支</th><th>よみ</th><th>今から</th></tr></thead><tbody>';
+  for(let y=c-100;y<=c+100;y++){
+    const bnd=cols.some(k=>{const l=erasInYear(y,k);return l.some(e=>e.s===y);});
+    const diff=now-y,ago=diff>0?diff+'年前':diff<0?(-diff)+'年後':'今年';
+    h+=`<tr data-y="${y}" class="${y===c?'c ':''}${bnd?'b ':''}${etCols.gak&&y===schoolY?'sy':''}" ${y===c?'id="etC"':''}><td class="y">${westYear(y)}年</td>`+cols.map(k=>`<td class="w">${eraCell(y,k)}</td>`).join('')+`<td>${eto(y)}</td><td class="k">${etoYomi(y)}</td><td class="k">${ago}</td></tr>`;
+  }
+  $('#etWrap').innerHTML=h+'</tbody></table>';
+  const r=$('#etC');if(r)$('#etWrap').scrollTop=r.offsetTop-$('#etWrap').clientHeight/2;
+}
+document.querySelectorAll('#etColsBox input').forEach(cb=>{cb.checked=etCols[cb.value];cb.onchange=()=>{etCols[cb.value]=cb.checked;eraTable(+$('#etYear').value);};});
+/* ---------- 学年（入学・卒業）早見 ---------- */
+function jpLabel(y,m){const e=eraForDate(y,m,1,'jp');if(!e)return '';const n=y-e.s+1;return e.n+(n===1?'元':n);}
+function renderSchool(){
+  const box=$('#etSchool');
+  if(!etCols.gak){box.innerHTML='';return;}
+  if(schoolY===null){box.innerHTML='<div class="sc"><div class="hint">表の西暦の行をクリックすると、その年に生まれた人の入学・卒業の年が出ます</div></div>';return;}
+  const Y=schoolY;
+  const rows=[
+    ['幼稚園入園（年少・3歳から）',4,4,null],['幼稚園入園（年中・4歳から）',5,4,null],['幼稚園卒園',7,3,null],
+    ['小学校入学',7,4,1947],['小学校卒業',13,3,1947],['中学校入学',13,4,1947],['中学校卒業',16,3,1947],
+    ['高校入学',16,4,1948],['高校卒業',19,3,1948],['大学入学（4年制）',19,4,1949],['大学卒業（4年制）',23,3,1949]];
+  const cell=(y,m,newFrom,start)=>`${y}年${m}月<br><span class="k">${jpLabel(y,m)}年</span>${newFrom&&start<newFrom?'<br><span class="old">'+(m===3&&y>=newFrom?'途中で新制に移行':'旧制の時代')+'</span>':''}`;
+  let h=`<div class="sc"><div class="sh"><b>${westYear(Y)}年（${jpLabel(Y,7)}年）生まれ${schoolWho?'：'+esc(schoolWho):''}</b><span>${eto(Y)}・まっすぐ進んだ場合</span></div>
+    <table><thead><tr><th></th><th>${westYear(Y)}年1月1日〜4月1日生まれ<br>（早生まれ・1学年上）</th><th>${westYear(Y)}年4月2日〜12月31日生まれ</th></tr></thead><tbody>`;
+  rows.forEach(([lab,add,m,newFrom])=>{
+    const st=lab.startsWith('小')?7:lab.startsWith('中')?13:lab.startsWith('高')?16:19;
+    h+=`<tr><th>${lab}</th><td class="${schoolEarly===true?'on':''}">${cell(Y+add-1,m,newFrom,newFrom?Y+st-1:0)}</td><td class="${schoolEarly===false?'on':''}">${cell(Y+add,m,newFrom,newFrom?Y+st:0)}</td></tr>`;
+  });
+  h+=`</tbody></table><div class="k" style="margin-top:6px;line-height:1.5">学年は4月2日から翌年4月1日生まれまでが同じ（4月1日生まれは早生まれ）。今の6・3・3・4制は小・中学校が1947年、高校が1948年、大学が1949年から。浪人・留年・飛び級はなしの年です。</div></div>`;
+  box.innerHTML=h;
+}
+$('#etWrap').addEventListener('click',e=>{if(!etCols.gak)return;const tr=e.target.closest('tr[data-y]');if(!tr)return;
+  schoolY=+tr.dataset.y;schoolEarly=null;schoolWho='';
+  $('#etWrap').querySelectorAll('tr.sy').forEach(t=>t.classList.remove('sy'));tr.classList.add('sy');renderSchool();});
+function openEraTable(){
+  const p=P(ui.sel);const I=p&&dateInfo(p.bd,calOf(p));
+  if(I){schoolY=I.wy;schoolWho=nameOf(p);schoolEarly=I.m?(I.m<4||(I.m===4&&I.d===1)):null;if(I.m===4&&!I.d)schoolEarly=null;}
+  $('#eraTbl').classList.add('open');eraTable(I?I.wy:new Date().getFullYear());
+}
+$('#etYear').addEventListener('change',e=>eraTable(parseInt(zen(e.target.value),10)||new Date().getFullYear()));
+$('#etPrev').onclick=()=>eraTable((+$('#etYear').value)-100);
+$('#etNext').onclick=()=>eraTable((+$('#etYear').value)+100);
+$('#etNow').onclick=()=>eraTable(new Date().getFullYear());
+$('#etClose').onclick=()=>$('#eraTbl').classList.remove('open');
+$('#eraTbl').addEventListener('click',e=>{if(e.target.id==='eraTbl')e.target.classList.remove('open');});
+$('#bEraTbl').onclick=()=>{$('#settings').classList.remove('open');openEraTable();};
+$('#setShort').onchange=e=>{settings.eraShort=e.target.checked;applySettings();render();openSettings();};
+$('#setWiz').onchange=e=>{settings.wizard=e.target.checked;applySettings();};
+$('#setRuby').onchange=e=>{settings.ruby=e.target.checked;applySettings();render();openSettings();};
+$('#setEto').onchange=e=>{settings.eto=e.target.checked;applySettings();render();openSettings();};
+
+/* ---------- つながり（関係の種類）の編集 ---------- */
+function renderRel(p){
+  const id=p.id;let h='';
+  const opts=(obj,v)=>Object.entries(obj).map(([k,l])=>`<option value="${k}"${k===v?' selected':''}>${l}</option>`).join('');
+  spouseFams(id).forEach(f=>{
+    const others=f.spouses.filter(x=>x!==id&&P(x));
+    if(!others.length)return;
+    const kind=f.kind||'m';
+    h+=`<div class="rrow"><div class="rh"><b>💍 ${esc(others.map(x=>nameOf(P(x))).join('・'))}</b><span>${f.children.length?f.children.length+'人の子':''}</span></div><div class="rc">
+      <select data-act="kind" data-f="${f.id}">${opts(KIND_LABEL,kind)}</select>
+      ${kind==='d'?`<input data-act="divY" data-num data-f="${f.id}" placeholder="離婚年" value="${esc(f.divY||'')}">`:''}
+      <select data-act="no" data-f="${f.id}" title="何番目の結婚か"><option value="">番号なし</option>${[1,2,3,4,5].map(n=>`<option value="${n}"${f.no==n?' selected':''}>${circ(n)}</option>`).join('')}</select>
+      <button class="btn" data-act="again" data-f="${f.id}" title="同じ相手ともう一度結婚">復縁</button>
+      <button class="btn" data-act="unS" data-f="${f.id}">外す</button></div></div>`;
+  });
+  const cf=childFams(id),pf=primaryFam(id);
+  cf.forEach(f=>{
+    const ps=f.spouses.filter(x=>P(x));
+    const t=ctype(f,id);
+    h+=`<div class="rrow"><div class="rh"><b>👪 ${ps.length?esc(ps.map(x=>nameOf(P(x))).join('・'))+' の子':'親の名前なし（兄弟だけ）'}</b></div><div class="rc">
+      <select data-act="ct" data-f="${f.id}">${opts(CT_LABEL,t)}</select>
+      ${cf.length>1?`<label><input type="radio" name="mainf" data-act="main" data-f="${f.id}"${f===pf?' checked':''}> この親の下に並べる</label>`:''}
+      <button class="btn" data-act="unP" data-f="${f.id}">外す</button></div></div>`;
+  });
+  if(!h)h='<div style="font-size:12px;color:var(--sub);margin-bottom:6px">まだ親・配偶者とのつながりがありません</div>';
+  $('#rel').innerHTML=h;
+}
+const famById=fid=>S.families.find(f=>f.id===fid);
+let relArmed=false;
+$('#rel').addEventListener('change',e=>{
+  const el=e.target,f=famById(el.dataset.f),p=P(ui.sel);if(!f||!p)return;
+  const a=el.dataset.act;
+  if(a==='kind'){snapshot();if(el.value==='m')delete f.kind;else f.kind=el.value;}
+  else if(a==='no'){snapshot();if(el.value)f.no=+el.value;else delete f.no;}
+  else if(a==='ct'){snapshot();f.ct=f.ct||{};if(el.value==='bio')delete f.ct[p.id];else f.ct[p.id]=el.value;}
+  else if(a==='main'){snapshot();p.mainFam=f.id;}
+  else return;
+  save();render();
+});
+$('#rel').addEventListener('focusin',e=>{if(e.target.dataset.act==='divY')relArmed=true;});
+$('#rel').addEventListener('input',e=>{const el=e.target;if(el.dataset.act!=='divY')return;const f=famById(el.dataset.f);if(!f)return;
+  if(relArmed){snapshot();relArmed=false;}f.divY=el.value;save();renderTree();});
+$('#rel').addEventListener('click',e=>{
+  const el=e.target.closest('button[data-act]');if(!el)return;const f=famById(el.dataset.f),p=P(ui.sel);if(!f||!p)return;
+  const a=el.dataset.act;snapshot();
+  if(a==='again'){S.families.push({id:uid('f'),spouses:f.spouses.slice(),children:[]});toast('同じ相手との2回目の結婚を足しました。前の結婚は「離婚」にしてください');}
+  else if(a==='unS'){f.spouses=f.spouses.filter(x=>x!==p.id);}
+  else if(a==='unP'){f.children=f.children.filter(x=>x!==p.id);if(f.ct)delete f.ct[p.id];if(p.mainFam===f.id)delete p.mainFam;}
+  cleanFamilies();save();render();
+});
+// 早世・父不詳・数え/満
+$('#fEarly').addEventListener('change',e=>{const p=P(ui.sel);if(!p)return;snapshot();if(e.target.checked)p.early=true;else delete p.early;save();render();});
+$('#fFu').addEventListener('change',e=>{const p=P(ui.sel);if(!p)return;snapshot();if(e.target.checked)p.fuShou=true;else delete p.fuShou;save();render();});
+$('#fKazoe').addEventListener('change',e=>{const p=P(ui.sel);if(!p)return;snapshot();if(e.target.value)p.kazoe=e.target.value;else delete p.kazoe;save();render();});
+$('#fKyonen').addEventListener('input',()=>datePreview());
+// 養親を新しく追加
+$('#bAddAdopt').onclick=()=>{const id=ui.sel;if(!id)return;snapshot();
+  const np=newPerson({sex:'m'});S.families.push({id:uid('f'),spouses:[np.id],children:[id],ct:{[id]:'adopt'}});afterAdd(np.id,'adoptParent',id);};
+// すでにいる人とつなぐ
+let lmMode=null;
+function openLink(mode){
+  if(!ui.sel)return;lmMode=mode;
+  $('#lmTitle').textContent=mode==='p'?'この人の親にする人を選ぶ':'この人の配偶者にする人を選ぶ';
+  $('#lmType').innerHTML=mode==='p'?Object.entries(CT_LABEL).map(([k,l])=>`<option value="${k}">${l}</option>`).join(''):Object.entries(KIND_LABEL).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+  $('#lmQ').value='';lmList();$('#linkM').classList.add('open');setTimeout(()=>$('#lmQ').focus(),30);
+}
+function lmList(){
+  const q=$('#lmQ').value.trim(),me=ui.sel;
+  const ids=Object.keys(S.persons).filter(id=>id!==me&&(!q||nameOf(P(id)).replace(/\s/g,'').includes(q.replace(/\s/g,''))||fullYomi(P(id)).replace(/\s/g,'').includes(q.replace(/\s/g,''))));
+  $('#lmList').innerHTML=ids.slice(0,200).map(id=>{const p=P(id),by=fmtDate(birthDt(p),{yearOnly:true,cal:calOf(p)});return `<div data-id="${id}">${esc(nameOf(p))}<small>${esc(by)}</small></div>`;}).join('')||'<div style="color:var(--sub);cursor:default">見つかりません</div>';
+}
+$('#lmQ').addEventListener('input',lmList);
+$('#lmClose').onclick=()=>$('#linkM').classList.remove('open');
+$('#linkM').addEventListener('click',e=>{if(e.target.id==='linkM')e.target.classList.remove('open');});
+$('#lmList').addEventListener('click',e=>{
+  const d=e.target.closest('[data-id]');if(!d)return;const x=d.dataset.id,me=ui.sel,t=$('#lmType').value;
+  $('#linkM').classList.remove('open');
+  if(lmMode==='s'){snapshot();const nf={id:uid('f'),spouses:[me,x],children:[]};if(t!=='m')nf.kind=t;S.families.push(nf);save();render();return;}
+  const link=f=>{snapshot();if(!f){f={id:uid('f'),spouses:[x],children:[]};S.families.push(f);}
+    if(!f.children.includes(me))f.children.push(me);if(t!=='bio'){f.ct=f.ct||{};f.ct[me]=t;}save();render();};
+  const fams=spouseFams(x).filter(f=>f.spouses.some(s=>s!==x));
+  if(!fams.length){link(null);return;}
+  chooser('どの組の子にしますか？',fams.map(f=>({label:f.spouses.map(s=>nameOf(P(s))).join('・')+' の子',fn:()=>link(f)})).concat([{label:nameOf(P(x))+' だけの子',fn:()=>link(null)}]));
+});
+$('#bLinkP').onclick=()=>openLink('p');$('#bLinkS').onclick=()=>openLink('s');
+
+/* ---------- よみ（名字のよみの自動入力・ほかの読み・一括修正） ---------- */
+function seiReadings(sei,exceptId){const c=new Map();Object.values(S.persons).forEach(q=>{if(q.id!==exceptId&&q.sei&&q.sei===sei&&q.seiYomi)c.set(q.seiYomi,(c.get(q.seiYomi)||0)+1);});
+  return [...c.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);}
+function renderYomiAlt(p){const box=$('#yomiAlt');if(!p){box.innerHTML='';return;}
+  const rs=p.sei?seiReadings(p.sei,p.id).filter(r=>r!==p.seiYomi):[];
+  let h=rs.length?'<span>ほかの読み：</span>'+rs.map(r=>`<button class="btn" data-yomi="${esc(r)}" style="padding:2px 8px;font-size:12px">${esc(r)}</button>`).join(''):'';
+  if(!p.seiYomi&&!p.meiYomi&&p.yomi)h+=`<span>以前のよみ：${esc(p.yomi)}（名字と名前に分けて入れてね）</span>`;
+  box.innerHTML=h;}
+$('#yomiAlt').addEventListener('click',e=>{const b=e.target.closest('[data-yomi]');if(!b)return;const p=P(ui.sel);if(!p)return;
+  snapshot();p.seiYomi=b.dataset.yomi;$('#fSeiYomi').value=p.seiYomi;save();renderTree();renderYomiAlt(p);});
+$('#fSei').addEventListener('change',()=>{const p=P(ui.sel);if(!p)return;
+  if(!p.seiYomi&&p.sei){const rs=seiReadings(p.sei,p.id);if(rs.length){p.seiYomi=rs[0];$('#fSeiYomi').value=rs[0];save();renderTree();}}
+  renderYomiAlt(p);});
+let oldSY=null;
+$('#fSeiYomi').addEventListener('focus',()=>{const p=P(ui.sel);oldSY=p?p.seiYomi||'':null;});
+$('#fSeiYomi').addEventListener('change',()=>{const p=P(ui.sel);if(!p||oldSY===null)return;const nw=p.seiYomi||'',old=oldSY;oldSY=null;renderYomiAlt(p);
+  if(!old||!nw||old===nw||!p.sei)return;
+  const others=Object.values(S.persons).filter(q=>q.id!==p.id&&q.sei===p.sei&&q.seiYomi===old);
+  if(!others.length)return;
+  chooser(`同じ名字（${p.sei}・${old}）の人が、ほかに${others.length}人います。全員「${nw}」に直しますか？`,[
+    {label:`全員「${nw}」に直す`,fn:()=>{snapshot();others.forEach(q=>q.seiYomi=nw);save();renderTree();toast(`${others.length}人のよみを直しました`,'元に戻す',undo);}},
+    {label:'この人だけ直す',fn:()=>{}}]);
+});
+
+/* ---------- 聞き取りモード ----------
+   質問は WZ_STEPS に並んだ順に出る。将来、写真・家紋の質問はここに足す（例：{k:'photo',...}）。 */
+let WZ=null; // {id, origin, rel, i, hist}
+const wzP=()=>WZ&&P(WZ.id);
+const nm0=id=>{const p=P(id);return p?(p.mei||p.sei?dispName(p,''):'その人'):'';};
+function wzReason(){
+  if(!WZ||!WZ.rel||!P(WZ.rel))return '';
+  const r=nm0(WZ.rel);
+  return {sibling:`${r}と兄弟ダカラ`,child:`${r}の子ダカラ`,parent:`${r}の親ダカラ`,spouse:`${r}の配偶者ダカラ`,adoptParent:`${r}の養親ダカラ`}[WZ.origin]||'';
+}
+function wzSexWord(p){return WZ&&WZ.origin==='parent'?(p.sex==='m'?'お父さん':p.sex==='f'?'お母さん':'親'):(p.sex==='m'?'男':p.sex==='f'?'女':'わからない');}
+const WZ_STEPS=[
+  {k:'sexParent',when:()=>WZ.origin==='parent'||WZ.origin==='adoptParent',make:p=>({type:'choice',q:`${nm0(WZ.rel)}の、お父さん？ お母さん？`,
+    opts:[['お父さん','m'],['お母さん','f'],['わからない','u']],cur:p.sex,set:v=>{p.sex=v;}})},
+  {k:'sei',make:p=>p.sei?{type:'confirm',q:`名字は「${p.sei}」でいいダカラ？`,sub:wzReason(),alt:{type:'text',q:'じゃあ名字、なにダカラ？',field:'sei',ph:'山田'}}
+                        :{type:'text',q:'名字、なにダカラ？',sub:WZ.origin==='self'?'まずはアナタのことから教えてダカラ！':'',field:'sei',ph:'山田',skip:'わからない'}},
+  {k:'seiYomi',when:p=>!!p.sei,make:p=>{const sug=p.seiYomi||seiReadings(p.sei,p.id)[0];
+    return sug?{type:'confirm',q:`「${p.sei}」のよみは「${sug}」でいいダカラ？`,yes:()=>{p.seiYomi=sug;},alt:{type:'text',q:'じゃあ名字のよみは？',field:'seiYomi',ph:'やまだ'}}
+              :{type:'text',q:`「${p.sei}」は、なんて読むダカラ？`,field:'seiYomi',ph:'やまだ',skip:'あとで'};}},
+  {k:'mei',make:p=>({type:'text',q:'名前、なにダカラ？',field:'mei',ph:'太郎',skip:'わからない'})},
+  {k:'meiYomi',when:p=>!!p.mei,make:p=>({type:'text',q:`「${p.mei}」は、なんて読むダカラ？`,field:'meiYomi',ph:'たろう',skip:'あとで'})},
+  {k:'sex',when:()=>!(WZ.origin==='parent'||WZ.origin==='adoptParent'),make:p=>({type:'choice',q:'男？ 女？',
+    opts:[['男','m'],['女','f'],['わからない','u']],cur:p.sex,set:v=>{p.sex=v;}})},
+  {k:'birth',make:p=>({type:'date',q:'いつ生まれたダカラ？',field:'bd',sub:'年だけでもOK。「1950」でも「昭和25年3月2日」でもいいヨ',skip:'わからない'})},
+  {k:'living',make:p=>{const I=dateInfo(p.bd,calOf(p));const old=I&&I.wy<new Date().getFullYear()-100;
+    return{type:'choice',q:'いまも元気ダカラ？（ご存命？）',opts:[['はい、元気','y'],['亡くなった','n'],['わからない','?']],cur:old?'n':(p.living?'y':'n'),
+      set:v=>{if(v==='y')p.living=true;else if(v==='n')p.living=false;else if(old)p.living=false;}};}},
+  {k:'death',when:p=>!p.living,make:p=>({type:'date',q:'いつ亡くなったダカラ？',field:'dd',skip:'わからない'})},
+  {k:'kyonen',when:p=>!p.living&&!p.bd&&!!p.dd,make:p=>({type:'text',q:'享年はいくつダカラ？（数え年）',field:'kyonen',ph:'72',num:true,skip:'わからない'})},
+  {k:'zoku',when:p=>{const f=primaryFam(p.id);return !!f&&f.children.length>=1&&(p.sex==='m'||p.sex==='f');},
+    make:p=>{const z=zokuMap().get(p.id);if(!z)return null;
+      return{type:'confirm',q:`兄弟の順番だと「${z.show}」ダカラ、それでいい？`,sub:'ちがうときは、正しい続柄を入れてネ',alt:{type:'text',q:'正しい続柄は？',field:'zoku',ph:'三男'}};}},
+  // ここに将来 photo / kamon の質問を足す
+  {k:'summary',make:p=>({type:'summary'})},
+  {k:'next',make:p=>({type:'next'})},
+];
+function startWizard(id,origin,rel){
+  if(!P(id))return;WZ={id,origin:origin||'edit',rel,i:-1,hist:[]};ui.sel=id;ui.expand=true;render();wzNext();
+}
+function stopWizard(toForm){WZ=null;shownSel=null;document.body.classList.remove('wiz-on');$('#sheet').classList.remove('wizmode');if(toForm){ui.expand=true;}renderSheet();}
+function wzNext(){
+  const p=wzP();if(!p){stopWizard();return;}
+  for(let i=WZ.i+1;i<WZ_STEPS.length;i++){const st=WZ_STEPS[i];if(st.when&&!st.when(p))continue;const m=st.make(p);if(!m)continue;
+    if(WZ.i>=0)WZ.hist.push(WZ.i);WZ.i=i;WZ.cur=m;wzShow();return;}
+  stopWizard();
+}
+function wzBack(){if(!WZ||!WZ.hist.length)return;WZ.i=WZ.hist.pop();const p=wzP();WZ.cur=WZ_STEPS[WZ.i].make(p);wzShow();}
+function wzSet(fn){const p=wzP();if(!p)return;snapshot();fn(p);shownSel=null;cleanFamilies();save();renderTree();$('#shName').textContent=nameOf(p);}
+function wzShow(){
+  const p=wzP();if(!p)return;const m=WZ.cur;
+  $('#sheet').classList.add('wizmode');document.body.classList.add('wiz-on');
+  $('#wzWho').textContent='💬 '+(p.mei||p.sei?nameOf(p):'新しい人')+' の聞き取り';
+  $('#wzBack').disabled=!WZ.hist.length;
+  const total=WZ_STEPS.length-2,pos=Math.min(WZ.i+1,total);$('#wzProg').textContent=WZ.cur.type==='summary'||WZ.cur.type==='next'?'':`${pos} / ${total}`;
+  const Q=$('#wzQ'),A=$('#wzA');let h='';
+  const qtxt=(q,sub)=>`<div class="wz-bubble">${esc(q)}${sub?`<div class="wz-sub">${esc(sub)}</div>`:''}</div>`;
+  if(m.type==='confirm'){Q.innerHTML=qtxt(m.q,m.sub);h=`<div class="wz-btns"><button class="wz-b main" data-a="yes">はい</button><button class="wz-b" data-a="no">ちがう</button></div>`;}
+  else if(m.type==='choice'){Q.innerHTML=qtxt(m.q,m.sub);h='<div class="wz-btns">'+m.opts.map(([l,v])=>`<button class="wz-b${v===m.cur?' main':''}" data-v="${v}">${esc(l)}</button>`).join('')+'</div>';}
+  else if(m.type==='text'||m.type==='date'){
+    Q.innerHTML=qtxt(m.q,m.sub);
+    const val=m.type==='date'?(p[m.field]?(p[m.field].raw||fmtDate(p[m.field],{fmt:p[m.field].src==='j'?'j':'w',cal:calOf(p)})):''):(p[m.field]||'');
+    h=`<input class="wz-in" id="wzIn" ${m.num||m.type==='date'?'data-num':''} placeholder="${esc(m.ph||(m.type==='date'?'1950 / 昭和25年3月2日':''))}" value="${esc(val)}" autocomplete="off">
+      ${m.type==='date'?'<div class="wz-prev" id="wzPrev"></div>':''}
+      <div class="wz-btns"><button class="wz-b main" data-a="ok">これでOK</button>${m.skip?`<button class="wz-b" data-a="skip">${esc(m.skip)}</button>`:''}</div>`;
+  }
+  else if(m.type==='summary'){
+    const I=dateInfo(birthDt(p),calOf(p)),D=dateInfo(p.dd,calOf(p)),z=zokuMap().get(p.id);
+    const rows=[['名前',nameOf(p)+(fullYomi(p)?`（${fullYomi(p)}）`:'')],['性別',{m:'男',f:'女',u:'わからない'}[p.sex]],
+      ['生まれ',I?fmtDate(birthDt(p),{fmt:'wj',cal:calOf(p)}):'わからない'],['',p.living?'ご存命':(D?fmtDate(p.dd,{fmt:'wj',cal:calOf(p)})+'没':'亡くなった（年はわからない）')],
+      ['続柄',z?z.show:'—']];
+    Q.innerHTML=qtxt('これでいいダカラ？');
+    h=`<table class="wz-sum">${rows.map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join('')}</table>
+      <div class="wz-btns"><button class="wz-b main" data-a="ok">これでOK</button><button class="wz-b" data-a="form">ふつうの画面で直す</button></div>`;
+  }
+  else if(m.type==='next'){
+    const pf=primaryFam(p.id),nPar=pf?pf.spouses.length:0;
+    Q.innerHTML=qtxt(`${nm0(p.id)}のこと、ありがとダカラ！ つぎは誰を足す？`,`${nm0(p.id)}から見て`);
+    const o=[];if(nPar<2){o.push(['お父さん','pm'],['お母さん','pf']);}o.push(['兄弟','sib'],['配偶者','sp'],['子ども','ch']);
+    h='<div class="wz-btns grid">'+o.map(([l,v])=>`<button class="wz-b" data-n="${v}">＋${l}</button>`).join('')+`<button class="wz-b main" data-n="end">おわり</button></div>`;
+  }
+  A.innerHTML=h;
+  const inp=$('#wzIn');
+  if(inp){const upd=()=>{if(m.type==='date'){const d=parseDateText(toHalf(inp.value));$('#wzPrev').textContent=!inp.value.trim()?'':d&&!d.raw?'→ '+fmtDate(d,{fmt:'wj',cal:calOf(p)}):'（読み取れないので、そのまま入れておくネ）';}};
+    inp.addEventListener('input',upd);upd();inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();wzAnswer('ok');}});
+    setTimeout(()=>{inp.focus();inp.select();},30);}
+}
+function wzAnswer(a,v){
+  const p=wzP();if(!p)return;const m=WZ.cur;
+  if(m.type==='confirm'){if(a==='yes'){if(m.yes)wzSet(m.yes);wzNext();}else{WZ.cur=m.alt;wzShow();}return;}
+  if(m.type==='choice'){wzSet(()=>m.set(v));wzNext();return;}
+  if(m.type==='text'){if(a==='skip'){wzNext();return;}const val=toHalf($('#wzIn').value).trim();
+    wzSet(q=>{if(val)q[m.field]=val;else if(m.field!=='sei')delete q[m.field];});
+    if(m.field==='sei'&&val&&!p.seiYomi){const r=seiReadings(val,p.id)[0];if(r)p.seiYomi=r;}
+    wzNext();return;}
+  if(m.type==='date'){if(a==='skip'){wzNext();return;}const val=toHalf($('#wzIn').value).trim();
+    wzSet(q=>{q[m.field]=val?parseDateText(val):null;if(m.field==='dd'&&val)q.living=false;});renderSheet();wzNext();return;}
+  if(m.type==='summary'){if(a==='form'){stopWizard(true);fillForm(p);openEditor(false);return;}wzNext();return;}
+}
+function wzAddNext(kind){
+  const id=WZ.id;
+  if(kind==='end'){stopWizard();toast('聞き取りおわり！ おつかれさまダカラ');return;}
+  if(kind==='pm'||kind==='pf'){addParent(id);const np=P(ui.sel);if(np&&np.id!==id){np.sex=kind==='pm'?'m':'f';if(!np.sei){np.sei=P(id).sei;np.seiYomi=P(id).seiYomi||'';}
+      save();renderTree();if(WZ&&WZ.id===np.id){WZ.i=WZ_STEPS.findIndex(s=>s.k==='sexParent');WZ.hist=[];wzNext();}}return;}
+  if(kind==='sib')addSibling(id);else if(kind==='sp')addSpouse(id);else if(kind==='ch')addChild(id);
+}
+$('#wzA').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!WZ)return;
+  if(b.dataset.n){wzAddNext(b.dataset.n);return;}
+  if(b.dataset.v!==undefined){wzAnswer('choice',b.dataset.v);return;}
+  wzAnswer(b.dataset.a);});
+$('#wzBack').onclick=wzBack;
+$('#wzExit').onclick=()=>{const p=wzP();stopWizard(true);if(p){shownSel=null;renderSheet();}};
+$('#bWiz').onclick=()=>{if(ui.sel)startWizard(ui.sel,'edit');};
+
+function openScrollSet(){
+  S.meta=S.meta||{};const m=S.meta,root=scrollRoot();
+  $('#mtTitle').value=m.title||'';$('#mtTitle').placeholder=(P(root).sei||'')+'家系図';
+  if(!m.date){const d=new Date();$('#mtDate').placeholder=`令和${d.getFullYear()-2018}年${d.getMonth()+1}月`;}
+  $('#mtDate').value=m.date||'';$('#mtAuthor').value=m.author||'';
+  const sel=$('#mtRoot');sel.innerHTML='';
+  const ids=Object.keys(S.persons).sort((x,y)=>(parentFam(x)?1:0)-(parentFam(y)?1:0));
+  ids.forEach(id=>{const o=document.createElement('option');o.value=id;const p=P(id);const by=fmtDate(p.bd,{yearOnly:true,cal:calOf(p)});o.textContent=nameOf(p)+(by?'（'+by+'）':'');if(id===root)o.selected=true;sel.appendChild(o);});
+  $('#scrollSet').classList.add('open');
+}
+let mArmed=false;
+document.querySelectorAll('#scrollSet [data-m]').forEach(el=>{el.addEventListener('focus',()=>{mArmed=true;});
+  el.addEventListener('input',()=>{if(mArmed){snapshot();mArmed=false;}S.meta=S.meta||{};S.meta[el.dataset.m]=el.value;save();renderTree();});});
+$('#mtDate').addEventListener('dblclick',e=>{if(!e.target.value){e.target.value=e.target.placeholder;e.target.dispatchEvent(new Event('input'));}});
+$('#mtRoot').addEventListener('change',e=>{snapshot();S.meta=S.meta||{};S.meta.root=e.target.value;save();render();fit();});
+$('#bScrollSet').onclick=openScrollSet;$('#ssClose').onclick=()=>$('#scrollSet').classList.remove('open');
+$('#scrollSet').addEventListener('click',e=>{if(e.target.id==='scrollSet')e.target.classList.remove('open');});
+
+/* ---------- 上部ボタン ---------- */
+document.querySelectorAll('#segView button').forEach(b=>b.onclick=()=>{ui.view=b.dataset.v;if(['focus','anc','desc'].includes(ui.view))ui.focus=ui.sel||ui.focus;save();render();fit();});
+document.querySelectorAll('#segDir button').forEach(b=>b.onclick=()=>{ui.dir=b.dataset.v;save();render();fit();});
+$('#bSet').onclick=openSettings;$('#setClose').onclick=()=>$('#settings').classList.remove('open');
+$('#settings').addEventListener('click',e=>{if(e.target.id==='settings')e.target.classList.remove('open');});
+$('#bLone').onclick=()=>{snapshot();const p=newPerson({});if(ui.view==='scroll'){ui.view='all';toast('巻物には始祖の家系だけが出るので、全体表示にしました');}
+  if(ui.view==='focus')ui.focus=p.id;save();ui.sel=p.id;ui.expand=true;
+  if(settings.wizard!==false){startWizard(p.id,'lone');ensureVisible(p.id);return;}
+  render();openEditor(false);$('#fSei').focus();ensureVisible(p.id);};
+$('#voDepth').onchange=e=>{ui.depth=+e.target.value;save();render();fit();};
+$('#voFan').onchange=e=>{ui.fan=e.target.checked;if(ui.fan&&ui.depth>7)ui.depth=7;save();render();fit();};
+$('#voRel').onchange=e=>{ui.rel=e.target.checked;save();render();};
+$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;
+$('#bMenu').onclick=e=>{e.stopPropagation();$('#menu').classList.toggle('open');};
+document.addEventListener('click',e=>{if(!e.target.closest('#menu')&&e.target.id!=='bMenu')$('#menu').classList.remove('open');});
+document.querySelectorAll('#menu button').forEach(b=>b.onclick=()=>{$('#menu').classList.remove('open');menuAct(b.dataset.m);});
+function menuAct(m){
+  if(m==='new'){if(!Object.keys(S.persons).length)return;snapshot();S={persons:{},families:[]};ui.sel=null;ui.focus=null;save();render();toast('新しく始めました','元に戻す',undo);}
+  else if(m==='sample'){snapshot();S=sample();ui.sel=null;ui.focus=null;save();render();fit();}
+  else if(m==='saveJson')download(JSON.stringify({app:'kakeizu-webapp',version:1,data:S},null,1),'kakeizu.json','application/json');
+  else if(m==='open')$('#file').click();
+  else if(m==='saveGed')download(toGedcom(),'kakeizu.ged','text/plain');
+  else if(m==='png')exportPng(null);
+  else if(m==='pngNames')exportPng('names');
+  else if(m==='pngAnon')exportPng('anon');
+}
+$('#file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;const t=await f.text();e.target.value='';
+  try{
+    let d;
+    if(/^\s*\{/.test(t)){const j=JSON.parse(t);d=j.data||j;if(!d.persons||!d.families)throw 0;}
+    else d=fromGedcom(t);
+    Object.values(d.persons).forEach(migratePerson);snapshot();S=d;ui.sel=null;ui.focus=null;save();render();fit();toast(`${Object.keys(S.persons).length}人を読み込みました`);
+  }catch(err){toast('読み込めませんでした（形式を確認してください）');}
+};
+$('#eStart').onclick=()=>{snapshot();const p=newPerson({sei:'',mei:''});save();ui.sel=p.id;render();fit();
+  if(settings.wizard!==false){startWizard(p.id,'self');}else{openEditor(false);setTimeout(()=>{$('#fSei').focus();},30);}};
+$('#eSample').onclick=()=>menuAct('sample');$('#eOpen').onclick=()=>menuAct('open');
+
+document.addEventListener('focusout',e=>{const el=e.target;if(!el.matches||!el.matches('input[data-num]'))return;
+  const v=toHalf(el.value);if(v!==el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}});
+document.addEventListener('keydown',e=>{
+  const typing=/INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){if(typing&&!e.shiftKey)return;e.preventDefault();e.shiftKey?redo():undo();}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+  else if(!typing&&(e.key==='Delete'||e.key==='Backspace')&&ui.sel){e.preventDefault();delPerson(ui.sel);}
+  else if(e.key==='Escape'){if(typing)document.activeElement.blur();else select(null);}
+});
+addEventListener('resize',()=>applyView());
+
+/* ---------- 小物 ---------- */
+let toastT=null;
+function toast(msg,btn,fn){const t=$('#toast');$('#tMsg').textContent=msg;const b=$('#tBtn');
+  if(btn){b.style.display='';b.textContent=btn;b.onclick=()=>{t.classList.remove('show');fn();};}else b.style.display='none';
+  t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),4000);}
+function chooser(title,items){
+  $('#mTitle').textContent=title;const body=$('#mBody');body.innerHTML='';
+  items.forEach(it=>{const b=document.createElement('button');b.className='btn';b.textContent=it.label;b.onclick=()=>{$('#modal').classList.remove('open');it.fn();};body.appendChild(b);});
+  $('#modal').classList.add('open');
+}
+$('#mCancel').onclick=()=>$('#modal').classList.remove('open');
+function download(text,name,type){const blob=text instanceof Blob?text:new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+
+async function embedFontCss(svgBody){
+  const f=fontDef();if(!f.gf)return '';
+  const tmp=document.createElement('div');tmp.innerHTML=`<svg>${svgBody}</svg>`;
+  const chars=[...new Set([...tmp.textContent])].join('');
+  const css=await (await fetch(`https://fonts.googleapis.com/css2?family=${f.gf}&text=${encodeURIComponent(chars)}`)).text();
+  const urls=[...css.matchAll(/url\((https:[^)]+)\)/g)].map(m=>m[1]);
+  let out=css;
+  for(const u of urls){
+    const blob=await (await fetch(u)).blob();
+    const data=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(blob);});
+    out=out.split(u).join(data);
+  }
+  return `<style>${out}</style>`;
+}
+async function exportPng(hide){
+  const r=drawTree({sel:null,hide});if(!r.bbox){toast('まだ誰もいません');return;}
+  const pad=40,b=r.bbox,W=b.w+pad*2,H=b.h+pad*2;
+  let style='';
+  if(fontDef().gf){toast('フォントを準備中…');
+    try{style=await embedFontCss(r.svg);}catch(e){toast('フォントを埋め込めなかったので、端末の文字で書き出します');}}
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${b.x-pad} ${b.y-pad} ${W} ${H}">${style}<rect x="${b.x-pad}" y="${b.y-pad}" width="${W}" height="${H}" fill="${theme().bg}"/>${r.svg}</svg>`;
+  const img=new Image();
+  img.onload=async()=>{try{await img.decode();}catch(e){}
+    const sc=Math.min(2,8000/W,8000/H);const c=document.createElement('canvas');c.width=Math.round(W*sc);c.height=Math.round(H*sc);
+    const ctx=c.getContext('2d');ctx.scale(sc,sc);ctx.drawImage(img,0,0);
+    c.toBlob(bl=>download(bl,hide?'kakeizu-public.png':'kakeizu.png'),'image/png');};
+  img.onerror=()=>toast('画像にできませんでした');
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+
+/* ---------- GEDCOM ---------- */
+function toGedcom(){
+  const ids=Object.keys(S.persons),im=new Map(ids.map((id,i)=>[id,'@I'+(i+1)+'@']));
+  const fm=new Map(S.families.map((f,i)=>[f,'@F'+(i+1)+'@']));
+  const L=['0 HEAD','1 SOUR KAKEIZU_WEBAPP','2 VERS 0.1','1 GEDC','2 VERS 5.5.1','2 FORM LINEAGE-LINKED','1 CHAR UTF-8'];
+  const one=s=>String(s).replace(/\r?\n/g,' ');
+  ids.forEach(id=>{const p=P(id);L.push(`0 ${im.get(id)} INDI`,`1 NAME ${one(p.mei)} /${one(p.sei)}/`);
+    if(p.mei)L.push(`2 GIVN ${one(p.mei)}`);if(p.sei)L.push(`2 SURN ${one(p.sei)}`);
+    const yo=fullYomi(p);if(yo)L.push(`1 _YOMI ${one(yo)}`);
+    L.push(`1 SEX ${p.sex==='m'?'M':p.sex==='f'?'F':'U'}`);
+    const gb=gedDate(birthDt(p),calOf(p)),gd=gedDate(p.dd,calOf(p));
+    if(gb)L.push('1 BIRT',`2 DATE ${one(gb)}`);
+    if(!p.living){if(gd)L.push('1 DEAT',`2 DATE ${one(gd)}`);else L.push('1 DEAT Y');}
+    if(p.note)L.push(`1 NOTE ${one(p.note)}`);
+    S.families.forEach(f=>{if(f.spouses.includes(id))L.push(`1 FAMS ${fm.get(f)}`);if(f.children.includes(id)){L.push(`1 FAMC ${fm.get(f)}`);const t=ctype(f,id);if(t==='adopt'||t==='special')L.push('2 PEDI adopted');else if(t==='step'||t==='yushi')L.push('2 PEDI foster');}});
+  });
+  S.families.forEach(f=>{L.push(`0 ${fm.get(f)} FAM`);
+    let sp=f.spouses.slice();const h=sp.find(x=>P(x).sex==='m')||sp[0];
+    if(h){L.push(`1 HUSB ${im.get(h)}`);sp=sp.filter(x=>x!==h);}
+    if(sp[0])L.push(`1 WIFE ${im.get(sp[0])}`);
+    if(f.kind==='d')L.push('1 DIV Y');
+    f.children.forEach(c=>L.push(`1 CHIL ${im.get(c)}`));});
+  L.push('0 TRLR');return L.join('\n');
+}
+function fromGedcom(text){
+  const D={persons:{},families:[]};const imap=new Map(),fams=[],pedi=[];let cur=null,l1='';
+  text.replace(/^﻿/,'').split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*(\d+)\s+(@[^@]+@\s+)?(\S+)\s?(.*)$/);if(!m)return;
+    const lv=+m[1],xref=m[2]&&m[2].trim(),tag=m[3],val=m[4]||'';
+    if(lv===0){cur=null;
+      if(tag==='INDI'&&xref){const p={id:uid('p'),sei:'',mei:'',seiYomi:'',meiYomi:'',sex:'u',bd:null,dd:null,living:true,note:''};D.persons[p.id]=p;imap.set(xref,p.id);cur={t:'I',p,xref};}
+      else if(tag==='FAM'){cur={t:'F',h:[],c:[],x:xref};fams.push(cur);}
+      return;}
+    if(!cur)return;
+    if(lv===1)l1=tag;
+    if(cur.t==='I'){const p=cur.p;
+      if(lv===1&&tag==='NAME'&&!p.sei&&!p.mei){const sm=val.match(/\/(.*?)\//);p.sei=sm?sm[1].trim():'';p.mei=val.replace(/\/.*?\//,'').trim();}
+      else if(lv===1&&tag==='SEX')p.sex=val.startsWith('M')?'m':val.startsWith('F')?'f':'u';
+      else if(lv===1&&tag==='DEAT')p.living=false;
+      else if(lv===1&&tag==='_YOMI'){const pa=val.trim().split(/[\s　]+/);if(pa.length===2){p.seiYomi=pa[0];p.meiYomi=pa[1];}else p.yomi=val;}
+      else if(lv===1&&tag==='FAMC')cur.famc=val.trim();
+      else if(lv===2&&tag==='PEDI'&&cur.famc){pedi.push([cur.xref,cur.famc,val.trim().toLowerCase()]);}
+      else if(lv===1&&tag==='NOTE')p.note=val;
+      else if(lv===2&&tag==='DATE'){if(l1==='BIRT')p.bd=parseDateText(val);else if(l1==='DEAT')p.dd=parseDateText(val);}
+    }else{
+      if(lv===1&&tag==='DIV')cur.div=true;
+      if(lv===1&&(tag==='HUSB'||tag==='WIFE'))cur.h.push(val.trim());
+      else if(lv===1&&tag==='CHIL')cur.c.push(val.trim());
+    }
+  });
+  fams.forEach(f=>{const s=f.h.map(x=>imap.get(x)).filter(Boolean),c=f.c.map(x=>imap.get(x)).filter(Boolean);
+    if(!(s.length+c.length))return;const nf={id:uid('f'),spouses:s,children:c};if(f.div)nf.kind='d';
+    pedi.forEach(([ix,fx,v])=>{if(fx===f.x&&imap.get(ix)){const t=v==='adopted'?'adopt':v==='foster'?'step':null;if(t){nf.ct=nf.ct||{};nf.ct[imap.get(ix)]=t;}}});
+    D.families.push(nf);});
+  if(!Object.keys(D.persons).length)throw 0;
+  return D;
+}
+
+/* ---------- 見本（架空の家族） ---------- */
+function sample(){
+  const D={persons:{},families:[]};let n=0;
+  const p=(sei,mei,sex,b,d,living)=>{const id='s'+(n++);D.persons[id]={id,sei,mei,seiYomi:'',meiYomi:'',sex,bd:parseDateText(b),dd:parseDateText(d),living:!!living,note:''};return id;};
+  const fam=(sp,ch)=>D.families.push({id:'sf'+D.families.length,spouses:sp,children:ch||[]});
+  const g1=p('山田','源一郎','m','1890','1960'),g2=p('山田','キク','f','1895','1970');
+  const a=p('山田','一郎','m','1920','1995'),b=p('鈴木','ハナ','f','1923','2010'),c=p('山田','次郎','m','1926','1944');
+  fam([g1,g2],[a,b,c]);
+  const a2=p('山田','トシ','f','1925','2015');
+  const k=p('山田','健一','m','1950','',1),kz=p('高橋','和子','f','1953','',1);
+  fam([a,a2],[k,kz]);
+  const bh=p('鈴木','正男','m','1920','1990');const kiyo=p('鈴木','清','m','1948','',1);
+  fam([bh,b],[kiyo]);
+  const ke=p('山田','恵子','f','1955','',1);
+  const t=p('山田','太郎','m','1980','',1),h=p('山田','花子','f','1983','',1);
+  fam([k,ke],[t,h]);
+  const kh=p('高橋','誠','m','1950','',1);const ks=p('高橋','翔','m','1982','',1);
+  const sj=p('高橋','誠二','m','1985','',1);
+  fam([kh,kz],[ks,sj]);
+  D.families.push({id:'sfA',spouses:[k,ke],children:[sj],ct:{[sj]:'adopt'}});
+  const ume=p('木村','ウメ','f','1892','1970');D.persons[ume].kyusei='';
+  D.families.unshift({id:'sfD',spouses:[g1,ume],children:[],kind:'d',divY:'1915',no:1});
+  D.families.find(x=>x.spouses.includes(g1)&&x.spouses.includes(g2)).no=2;
+  const YM={山田:'やまだ',鈴木:'すずき',高橋:'たかはし',木村:'きむら'};
+  const MY={源一郎:'げんいちろう',キク:'きく',一郎:'いちろう',ハナ:'はな',次郎:'じろう',トシ:'とし',健一:'けんいち',和子:'かずこ',正男:'まさお',清:'きよし',恵子:'けいこ',太郎:'たろう',花子:'はなこ',誠:'まこと',翔:'しょう',誠二:'せいじ',ウメ:'うめ'};
+  Object.values(D.persons).forEach(q=>{q.seiYomi=YM[q.sei]||'';q.meiYomi=MY[q.mei]||'';});
+  D.meta={title:'',root:g1,date:'',author:''};
+  return D;
+}
+
+/* ---------- 起動 ---------- */
+load();Object.values(S.persons).forEach(migratePerson);applySettings();render();requestAnimationFrame(fit);
+})();
+</script>
+</body>
+</html>
